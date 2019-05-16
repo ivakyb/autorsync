@@ -91,7 +91,7 @@ function rsync_cmd
 {
    ff=$(mktemp) && trap "rm $ff" exit
    while read -d $'\x04' ;do
-      echodbg $'\n'"<==>$REPLY"
+      echodbg $'\n'"$(test "$1" == "$SRC" && echo "L==>R" || echo "L<==R")$REPLY"
       echo "$REPLY" >$ff #| cut -d' ' -f1 >$ff
       normalize_path "$NORMALIZE_PATH" -i $ff
       rsync -v --archive --relative --delete --delete-missing-args --info=progress2 --files-from=$ff --temp-dir=.rsync.temp --exclude='.rsync.temp/*' "$@"  ||  true
@@ -104,17 +104,16 @@ fswatch_cmd "$SRC" | NORMALIZE_PATH="$(realpath "$SRC")" rsync_cmd "$SRC" "$DST"
 
 DST_HOST=$(cut -d: -f1 <<<$DST)
 DST_PATH=$(cut -d: -f2 <<<$DST)
-#ssh $DST_HOST bash -xc "set -euo pipefail; '`declare -f remote_fswatch`; DST_PATH=\"$DST_PATH\" remote_fswatch;'" | rsync_from_dst
-ssh $DST_HOST bash - <<END  | NORMALIZE_PATH="$(ssh "$DST_HOST" realpath "$DST_PATH")" rsync_cmd "$DST" "$SRC"  & pid_rx=$!
+ssh $DST_HOST bash -x - <<END  | NORMALIZE_PATH="$(ssh "$DST_HOST" realpath "$DST_PATH")" rsync_cmd "$DST" "$SRC"  & pid_rx=$!
 set -euo pipefail
 mkdir -p "$DST_PATH"/.rsync.temp
 #trap "rm -rf $DST_PATH/.rsync.temp" exit
 period=$period
-`declare -f fswatch_cmd`
+ulimit -n 10000
+`declare -f fswatch_cmd echoerr echowarn echodbg`
+echowarn XXX $PWD
 fswatch_cmd "$DST_PATH"
 END
-#
-#"$(ssh $DST_HOST realpath $DST_PATH)"  #"(read l; echo "$l")"
 
 wait
 echoinfo DDDDOOOOMMMEEE
@@ -132,3 +131,6 @@ echoinfo DDDDOOOOMMMEEE
 
 ## KNOWN ISSUES
 ## fswatch on MacOS does not detect deleted folder
+## may need to set max number of open file descriptors ulimit -n 10000
+
+## NEED periodic full update
