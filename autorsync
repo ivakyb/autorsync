@@ -1,0 +1,129 @@
+#!/usr/bin/env bash
+set -euo pipefail
+DEBUG=1
+## On MacOS need:
+##   brew install coreutils && ln -s greadlink /usr/local/bin/readlink  &&   ln -s gmktemp /usr/local/bin/mktemp
+readonly mydir="$( dirname $(readlink -f ${BASH_SOURCE[0]} ) )"
+
+source $mydir/utils.bash
+#source $mydir/environment
+
+
+#REMOTE_PATH="rsync://localhost:10873/root/"
+unset SRC
+unset DST
+
+## Parse options
+while (( $# > 0 ))
+do
+   case "$1" in
+      --exclude=*)  ;;
+      --*) echoerr "Unknown option: $1" ;;
+      *) if var_is_unset_or_empty SRC ;then
+            SRC+=("$1")
+         elif var_is_unset_or_empty DST ;then
+            DST="$1"
+         else
+            SRC+=" $DST"
+            #echowarn "SRC and DST already set. Ignoring $1"
+         fi
+   esac
+   shift
+done
+## Assert
+var_is_set_not_empty SRC || fatalerr "Source is not set" 
+var_is_set_not_empty DST || fatalerr "Destionation is not set" 
+
+
+## Initial sync
+echoinfo "Begin initial sync to container. Nothing will be deleted, only copy and update."
+rsync -aR --info=progress2  \
+   --exclude-from=<( cat <<END
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.fseventsd
+.DS_Store
+build-*
+END
+) \
+   "$SRC" "$DST"  &&
+   echoinfo "Initial sync to container done."  ||
+   echowarn "Initial sync finished with errors/warnings."
+
+## Sync on change
+period=0.5
+echoinfo "Startning sync_on_change with period=$period"
+
+#fswatch "$SRC" --exclude 'index.lock' --exclude '\.idea/.*' --exclude '.*___jb_old___' --exclude '.*___jb_tmp___' --exclude '\.DS_Store' --exclude '\.git/FETCH_HEAD' --latency $period  | {
+#   fifo=$(mktemp --dry-run)  ## Get name for temperal FIFO
+#   mkfifo $fifo
+#   trap "rm $fifo" exit
+#   while true; do
+#      read -t0 || { sleep 0.1; continue; }  ## Check if there are new events, do not run rsync if there is nothing to process
+#      tee $fifo &  cat_pid=$!  ## Read from stdin (piped from fswatch) to stdout (show what is going) and to $fifo for rsync
+#      rsync -v --archive --relative --delete --info=progress2 --files-from=$fifo  "$SRC"  "$DST"  &  rsync_pid=$!
+#      sleep $period  ## Optimization period, wait to fill $fifo
+#      kill $cat_pid  ## Will close $fifo and rsync will begin syncing files
+#      #wait $rsync_pid  ## Wait for previous rsync request
+#   done
+#}
+
+### See https://github.com/emcrisostomo/fswatch/issues/212#issuecomment-473369919 for full list of events
+#EndOfTransmittion=$'\x04'
+#fswatch "$SRC" --batch-marker=$'\x04' \
+#      --latency $period \
+#      --recursive \
+#      --event" "{Created,Updated,Removed,Renamed,AttributeModified} \
+#      --exclude 'index.lock' --exclude '\.idea/.*' --exclude '.*___jb_old___' --exclude '.*___jb_tmp___' \
+#      --exclude '\.DS_Store' --exclude '\.git/FETCH_HEAD'   | 
+#{
+#   ff=$(mktemp) && trap "rm $ff" exit
+#   while read -d $'\x04' ;do
+#      echodbg ---
+#      echodbg "$REPLY"
+#      echodbg ---
+#      echo "$REPLY" >$ff
+#      rp="$(realpath $SRC)"
+#      echoinfo $rp
+#      sed -i "s#$rp/##g" $ff   ## Use relative paths, strip absolute path of SRC from the results of fswatch
+#      catdbg $ff
+#      rsync -v --archive --relative --delete --info=progress2 --files-from=$ff  "$SRC"  "$DST"  #&  rsync_pid=$!
+#   done
+#}
+
+function remote_fswatch
+{
+   set -euo pipefail
+   EndOfTransmittion=$'\x04'; declare -rn EOT=EndOfTransmittion  ## read-only alias
+   cd "$DST_PATH"
+   fswatch . --batch-marker=$'\x04' \
+         --recursive \
+         --latency 1 \
+         --event Created --event Updated --event Removed --event Renamed --event AttributeModified \
+         --exclude 'index.lock' --exclude '\.idea/.*' --exclude '.*___jb_old___' --exclude '.*___jb_tmp___' \
+         --exclude '\.DS_Store' --exclude '\.git/FETCH_HEAD'
+}
+
+function rsync_from_dst
+{
+   ff=$(mktemp) && trap "rm $ff" exit
+   while read -d $'\x04' ;do
+      echodbg ===
+      echodbg "$REPLY"
+      echodbg ===
+      echo "$REPLY" >$ff
+      rp="$(ssh $DST_HOST realpath $DST_PATH)"
+      echoinfo $rp
+      sed -iE -e"s#$rp/##g" $ff   ## Use relative paths, strip absolute path of SRC from the results of fswatch
+      catdbg $ff
+      rsync -v --archive --relative --delete --info=progress2 --files-from=$ff  "$DST"  "$SRC"  #&  rsync_pid=$!
+   done
+}
+
+DST_HOST=$(cut -d: -f1 <<<$DST)
+DST_PATH=$(cut -d: -f2 <<<$DST)
+ssh $DST_HOST bash -xc "'`declare -f remote_fswatch`; DST_PATH=\"$DST_PATH\" remote_fswatch;'" | rsync_from_dst
+
+
+#wait || kill $(jobs -p)
