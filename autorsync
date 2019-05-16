@@ -8,6 +8,14 @@ readonly mydir="$( dirname $(readlink -f ${BASH_SOURCE[0]} ) )"
 source $mydir/utils.bash
 #source $mydir/environment
 
+if test `uname` == Darwin ;then
+   alias sed=gsed
+   alias find=gfind
+   alias date=gdate
+   alias cp=gcp
+   alias mv=gmv
+   alias ls=gls
+fi
 
 #REMOTE_PATH="rsync://localhost:10873/root/"
 unset SRC
@@ -17,6 +25,7 @@ unset DST
 while (( $# > 0 ))
 do
    case "$1" in
+      --initial-exclude=*) ;;
       --exclude=*)  ;;
       --*) echoerr "Unknown option: $1" ;;
       *) if var_is_unset_or_empty SRC ;then
@@ -24,8 +33,9 @@ do
          elif var_is_unset_or_empty DST ;then
             DST="$1"
          else
-            SRC+=" $DST"
-            #echowarn "SRC and DST already set. Ignoring $1"
+            #SRC+=("$DST")
+            #DST="$1"
+            echowarn "SRC and DST already set. Ignoring $1"
          fi
    esac
    shift
@@ -52,78 +62,73 @@ END
    echowarn "Initial sync finished with errors/warnings."
 
 ## Sync on change
-period=0.5
+period=1
 echoinfo "Startning sync_on_change with period=$period"
 
-#fswatch "$SRC" --exclude 'index.lock' --exclude '\.idea/.*' --exclude '.*___jb_old___' --exclude '.*___jb_tmp___' --exclude '\.DS_Store' --exclude '\.git/FETCH_HEAD' --latency $period  | {
-#   fifo=$(mktemp --dry-run)  ## Get name for temperal FIFO
-#   mkfifo $fifo
-#   trap "rm $fifo" exit
-#   while true; do
-#      read -t0 || { sleep 0.1; continue; }  ## Check if there are new events, do not run rsync if there is nothing to process
-#      tee $fifo &  cat_pid=$!  ## Read from stdin (piped from fswatch) to stdout (show what is going) and to $fifo for rsync
-#      rsync -v --archive --relative --delete --info=progress2 --files-from=$fifo  "$SRC"  "$DST"  &  rsync_pid=$!
-#      sleep $period  ## Optimization period, wait to fill $fifo
-#      kill $cat_pid  ## Will close $fifo and rsync will begin syncing files
-#      #wait $rsync_pid  ## Wait for previous rsync request
-#   done
-#}
 
-### See https://github.com/emcrisostomo/fswatch/issues/212#issuecomment-473369919 for full list of events
-#EndOfTransmittion=$'\x04'
-#fswatch "$SRC" --batch-marker=$'\x04' \
-#      --latency $period \
-#      --recursive \
-#      --event" "{Created,Updated,Removed,Renamed,AttributeModified} \
-#      --exclude 'index.lock' --exclude '\.idea/.*' --exclude '.*___jb_old___' --exclude '.*___jb_tmp___' \
-#      --exclude '\.DS_Store' --exclude '\.git/FETCH_HEAD'   | 
-#{
-#   ff=$(mktemp) && trap "rm $ff" exit
-#   while read -d $'\x04' ;do
-#      echodbg ---
-#      echodbg "$REPLY"
-#      echodbg ---
-#      echo "$REPLY" >$ff
-#      rp="$(realpath $SRC)"
-#      echoinfo $rp
-#      sed -i "s#$rp/##g" $ff   ## Use relative paths, strip absolute path of SRC from the results of fswatch
-#      catdbg $ff
-#      rsync -v --archive --relative --delete --info=progress2 --files-from=$ff  "$SRC"  "$DST"  #&  rsync_pid=$!
-#   done
-#}
-
-function remote_fswatch
+function fswatch_cmd
 {
-   set -euo pipefail
-   EndOfTransmittion=$'\x04'; declare -rn EOT=EndOfTransmittion  ## read-only alias
-   cd "$DST_PATH"
-   fswatch . --batch-marker=$'\x04' \
+   ## See https://github.com/emcrisostomo/fswatch/issues/212#issuecomment-473369919 for full list of events
+   EndOfTransmittion=$'\x04'
+   fswatch "$1" --batch-marker=$'\x04' \
+         --latency $period \
          --recursive \
-         --latency 1 \
-         --event Created --event Updated --event Removed --event Renamed --event AttributeModified \
-         --exclude 'index.lock' --exclude '\.idea/.*' --exclude '.*___jb_old___' --exclude '.*___jb_tmp___' \
-         --exclude '\.DS_Store' --exclude '\.git/FETCH_HEAD'
+         --event Created --event Updated --event Removed --event Renamed --event AttributeModified --event OwnerModified \
+         --exclude '.*/index.lock' --exclude '\.idea/.*' --exclude '.*___jb_old___' --exclude '.*___jb_tmp___' \
+         --exclude '\.DS_Store' --exclude '\.git/FETCH_HEAD' --exclude '\.rsync\.temp/.*'
+         #--event" "{Created,Updated,Removed,Renamed,AttributeModified} \   
+         #--event IsFile --event IsDir --event IsSymLink \
+         #--event-flags \
 }
 
-function rsync_from_dst
+function normalize_path
+{
+   local rp="$1"; shift
+   sed -e"s#$rp/##g" -e"s#^$rp\$##g" "$@"  ## linux's inotify can respond with PWD folder, which we will not use
+}
+
+function rsync_cmd
 {
    ff=$(mktemp) && trap "rm $ff" exit
    while read -d $'\x04' ;do
-      echodbg ===
-      echodbg "$REPLY"
-      echodbg ===
-      echo "$REPLY" >$ff
-      rp="$(ssh $DST_HOST realpath $DST_PATH)"
-      echoinfo $rp
-      sed -iE -e"s#$rp/##g" $ff   ## Use relative paths, strip absolute path of SRC from the results of fswatch
-      catdbg $ff
-      rsync -v --archive --relative --delete --info=progress2 --files-from=$ff  "$DST"  "$SRC"  #&  rsync_pid=$!
+      echodbg $'\n'"<==>$REPLY"
+      echo "$REPLY" >$ff #| cut -d' ' -f1 >$ff
+      normalize_path "$NORMALIZE_PATH" -i $ff
+      rsync -v --archive --relative --delete --delete-missing-args --info=progress2 --files-from=$ff --temp-dir=.rsync.temp --exclude='.rsync.temp/*' "$@"  ||  true
    done
 }
 
+mkdir -p $SRC/.rsync.temp
+fswatch_cmd "$SRC" | NORMALIZE_PATH="$(realpath "$SRC")" rsync_cmd "$SRC" "$DST"  & pid_tx=$!
+
+
 DST_HOST=$(cut -d: -f1 <<<$DST)
 DST_PATH=$(cut -d: -f2 <<<$DST)
-ssh $DST_HOST bash -xc "'`declare -f remote_fswatch`; DST_PATH=\"$DST_PATH\" remote_fswatch;'" | rsync_from_dst
+#ssh $DST_HOST bash -xc "set -euo pipefail; '`declare -f remote_fswatch`; DST_PATH=\"$DST_PATH\" remote_fswatch;'" | rsync_from_dst
+ssh $DST_HOST bash - <<END  | NORMALIZE_PATH="$(ssh "$DST_HOST" realpath "$DST_PATH")" rsync_cmd "$DST" "$SRC"  & pid_rx=$!
+set -euo pipefail
+mkdir -p "$DST_PATH"/.rsync.temp
+#trap "rm -rf $DST_PATH/.rsync.temp" exit
+period=$period
+`declare -f fswatch_cmd`
+fswatch_cmd "$DST_PATH"
+END
+#
+#"$(ssh $DST_HOST realpath $DST_PATH)"  #"(read l; echo "$l")"
 
+wait
+echoinfo DDDDOOOOMMMEEE
 
+### Wait for jobs exit, if interrupted try normally close them, if they fail to close during 2 seconds, force kill.
 #wait || kill $(jobs -p)
+#sleep 0.3
+#JOBS="$(jobs -p)"
+#if test "$JOBS" ;then
+#   sleep 1.7
+#   JOBS="$(jobs -p)"
+#   test "$JOBS" && kill -9 "$JOBS"  ## Force kill if did not clone
+#fi
+
+
+## KNOWN ISSUES
+## fswatch on MacOS does not detect deleted folder
