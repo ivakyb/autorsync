@@ -89,6 +89,7 @@ function normalize_path
 
 function rsync_cmd
 {
+   ## ToDo OPTIMIZATION if DST is ssh-url, start rsyncd on destination host and user rsync:// for often rsync requests. Will be faster because does not need open ssh connection every time.
    ff=$(mktemp) && trap "rm $ff" exit
    while read -d $'\x04' ;do
       echodbg $'\n'"$(test "$1" == "$SRC" && echo "L==>R" || echo "L<==R")$REPLY"
@@ -130,7 +131,7 @@ echoinfo DDDDOOOOMMMEEE
 
 
 ## KNOWN ISSUES
-## fswatch on MacOS does not detect deleted folder
+## fswatch on MacOS does not detect deleted folder (CHECK)
 ## may need to set max number of open file descriptors ulimit -n 10000
-
+## fswatch is not a good solution for linux due to Error: Event queue overflow. and long delays. Try inotify-hookable or inotifywait
 ## NEED periodic full update
