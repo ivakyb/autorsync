@@ -9,6 +9,7 @@ source $mydir/utils.bash
 #source $mydir/environment
 
 if test `uname` == Darwin ;then
+
    alias sed=gsed
    alias find=gfind
    alias date=gdate
@@ -20,6 +21,8 @@ fi
 #REMOTE_PATH="rsync://localhost:10873/root/"
 unset SRC
 unset DST
+USE_TX=y
+USE_RX=y
 
 ## Parse options
 while (( $# > 0 ))
@@ -27,9 +30,29 @@ do
    case "$1" in
       --initial-exclude=*) ;;
       --exclude=*)  ;;
+      --tx|--use-tx)
+         USE_TX=y
+         ;;
+      --rx|--use-rx)
+         USE_RX=y
+         ;;
+      --no-tx|--notx)
+         unset USE_TX
+         ;;
+      --no-rx|--norx)
+         unset USE_RX
+         ;;
+      --only-tx|--tx-only)
+         USE_TX=y
+         unset USE_RX
+         ;;
+      --only-rx|--rx-only)
+         USE_RX=y
+         unset USE_TX
+         ;;
       --*) echoerr "Unknown option: $1" ;;
       *) if var_is_unset_or_empty SRC ;then
-            SRC+=("$1")
+            SRC+=("$1") 
          elif var_is_unset_or_empty DST ;then
             DST="$1"
          else
@@ -46,32 +69,30 @@ var_is_set_not_empty DST || fatalerr "Destionation is not set"
 
 
 ## Initial sync
-echoinfo "Begin initial sync to container. Nothing will be deleted, only copy and update."
-rsync -aR --info=progress2  \
-   --exclude-from=<( cat <<END
-.Spotlight-V100
-.TemporaryItems
-.Trashes
-.fseventsd
-.DS_Store
-build-*
+function initial_tx
+{
+   echoinfo "Begin initial sync to container. Nothing will be deleted, only copy and update."
+   rsync -aR --info=progress2  \
+      --exclude-from=<( cat <<END
+   .Spotlight-V100
+   .TemporaryItems
+   .Trashes
+   .fseventsd
+   .DS_Store
+   build-*
 END
-) \
-   "$SRC" "$DST"  &&
-   echoinfo "Initial sync to container done."  ||
-   echowarn "Initial sync finished with errors/warnings."
-
-## Sync on change
-period=1
-echoinfo "Startning sync_on_change with period=$period"
-
+   ) \
+      "$SRC" "$DST"  &&
+      echoinfo "Initial sync to container done."  ||
+      echowarn "Initial sync finished with errors/warnings."
+}
 
 function fswatch_cmd
 {
    ## See https://github.com/emcrisostomo/fswatch/issues/212#issuecomment-473369919 for full list of events
    EndOfTransmittion=$'\x04'
    fswatch "$1" --batch-marker=$'\x04' \
-         --latency $period \
+         --latency ${period:=1} \
          --recursive \
          --event Created --event Updated --event Removed --event Renamed --event AttributeModified --event OwnerModified \
          --exclude '.*/index.lock' --exclude '\.idea/.*' --exclude '.*___jb_old___' --exclude '.*___jb_tmp___' \
@@ -99,22 +120,47 @@ function rsync_cmd
    done
 }
 
-mkdir -p $SRC/.rsync.temp
-fswatch_cmd "$SRC" | NORMALIZE_PATH="$(realpath "$SRC")" rsync_cmd "$SRC" "$DST"  & pid_tx=$!
+function rsync_tx
+{
+   mkdir -p $SRC/.rsync.temp
+   fswatch_cmd "$SRC" | 
+      NORMALIZE_PATH="$(realpath "$SRC")" \
+      rsync_cmd "$SRC" "$DST"
+}
 
-
-DST_HOST=$(cut -d: -f1 <<<$DST)
-DST_PATH=$(cut -d: -f2 <<<$DST)
-ssh $DST_HOST bash -x - <<END  | NORMALIZE_PATH="$(ssh "$DST_HOST" realpath "$DST_PATH")" rsync_cmd "$DST" "$SRC"  & pid_rx=$!
-set -euo pipefail
-mkdir -p "$DST_PATH"/.rsync.temp
-#trap "rm -rf $DST_PATH/.rsync.temp" exit
-period=$period
-ulimit -n 10000
-`declare -f fswatch_cmd echoerr echowarn echodbg`
-echowarn XXX $PWD
-fswatch_cmd "$DST_PATH"
+function rsync_rx
+{
+   DST_HOST=$(cut -d: -f1 <<<$DST)
+   DST_PATH=$(cut -d: -f2 <<<$DST)
+   ssh $DST_HOST bash -x - <<END  | NORMALIZE_PATH="$(ssh "$DST_HOST" realpath "$DST_PATH")" rsync_cmd "$DST" "$SRC"
+      set -euo pipefail
+      mkdir -p "$DST_PATH"/.rsync.temp
+      #trap "rm -rf $DST_PATH/.rsync.temp" exit
+      period=$period
+      ulimit -n 10000
+      `declare -f fswatch_cmd echoerr echowarn echodbg`
+      echowarn XXX $PWD
+      fswatch_cmd "$DST_PATH"
 END
+}
+
+## Sync on change
+period=1
+#echoinfo "Startning sync_on_change with period=$period"
+
+if var_is_set USE_TX ;then
+   initial_tx
+   echoinfo "Starting rsync_tx"
+   rsync_tx  & pid_tx=$!
+   echoinfo "pid_rsync_tx $pid_tx"
+fi
+
+if var_is_set USE_RX ;then
+   echoinfo "Starting rsync_rx"
+   rsync_rx  & pid_rx=$!
+   echoinfo "pid_rsync_rx $pid_rx"
+fi
+
 
 wait
 echoinfo DDDDOOOOMMMEEE
