@@ -1,9 +1,24 @@
-image: alpine
+image: registry.gitlab.com/kyb/autorsync/autorsync-builder-alpine
+## alpine with bash git openssh-client
 
 build:
+  stage: build
   script:
   - sed -f ./build.sed autorsync.bash >autorsync
   - chmod +x autorsync
   artifacts:
     paths: 
     - "./autorsync"
+
+deploy:
+  stage: deploy
+  only:
+  - master
+  script:
+  - git stash save -u -a autorsync
+  - git checkout artifacts/master
+  - git stash pop
+  - git add autorsync
+  - git commit -m"Build $(date)"
+  - echo "$KI" >/tmp/ki  &&  chmod 400 /tmp/ki
+  - GIT_SSH_COMMAND='ssh -oStrictHostKeyChecking=no -i /tmp/ki' git push git@gitlab.com:kyb/autorsync.git HEAD:artifacts/master
