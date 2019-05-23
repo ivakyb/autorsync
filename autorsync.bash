@@ -9,7 +9,6 @@ source $mydir/utils.bash
 #source $mydir/environment
 
 if test `uname` == Darwin ;then
-
    alias sed=gsed
    alias find=gfind
    alias date=gdate

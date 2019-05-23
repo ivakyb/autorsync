@@ -1,0 +1,9 @@
+image: alpine
+
+build:
+  script:
+  - sed -f ./build.sed autorsync.bash >autorsync
+  - chmod +x autorsync
+  artifacts:
+    paths: 
+    - "./autorsync"
