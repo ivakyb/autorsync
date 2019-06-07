@@ -68,6 +68,8 @@ var_is_set_not_empty DST || fatalerr "Destionation is not set"
 
 
 ## Initial sync
+##!!!!!!!!!! FIXME CANNOT SYNC TO EXISTING FOLDER
+##!!!!!!!!! IF DST IS DIR AND EXIST DST for this stage must go up one layer
 function initial_tx
 {
    echoinfo "Begin initial sync to container. Nothing will be deleted, only copy and update."
