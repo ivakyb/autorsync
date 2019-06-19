@@ -50,3 +50,31 @@ store_artifacts:
   - git push "$SSH_URL" HEAD:artifacts/$CI_COMMIT_REF_NAME #ToDo use $CI_REPOSITORY_URL
   ## ----------- EPILOG -----------
   - echo "See artifacts at "$'\e[1;37m'"$CI_PROJECT_URL/tree/artifacts/$CI_COMMIT_REF_NAME"$'\e[0m'
+
+
+## ToDO use git ls-remote. No fetch required. Much faster on a big repos!
+remove_stale_artifacts:
+  stage: deploy
+  dependencies:
+  image: alpine
+  variables:
+    GIT_CHECKOUT: "false"
+    GIT_SUBMODULE_STRATEGY: none
+  script:
+  - apk add --no-cache git perl openssh-client
+  - mkdir /temp  &&  mount -t tmpfs -o size=500m tmpfs /temp
+  ## --- FIND STALED ARTIFACTS BRANCHES ---
+  - git branch -r  --list origin/artifacts/\* | grep -v HEAD | sed -e s#origin/##g -Ee s#^\\s+##g >/temp/ARTIFACTS_BRANCHES
+  - DEBUG cat /temp/ARTIFACTS_BRANCHES
+  - git branch -r  --list origin/\*           | grep -v -e HEAD -e artifacts/| sed -e s#origin/##g -Ee s#^\\s+#artifacts/#g >/temp/BRANCHES
+  - DEBUG cat /temp/BRANCHES
+  - fgrep -vf /temp/BRANCHES /temp/ARTIFACTS_BRANCHES >/temp/STALE_ARTIFACTS_BRANCHES  ||  return 0
+  - DEBUG cat /temp/STALE_ARTIFACTS_BRANCHES
+  - PUSH_SPEC=$(sed -e 's#\s+##g' -e 's#^#:#g' /temp/STALE_ARTIFACTS_BRANCHES)
+  - DEBUG echo "$PUSH_SPEC"
+  ## --------- URL --------------
+  - echo "$KI" >/tmp/ki  &&  chmod 400 /tmp/ki
+  - export GIT_SSH_COMMAND="ssh -i/tmp/ki -oStrictHostKeyChecking=no"
+  - SSH_URL=$(echo "$CI_REPOSITORY_URL" | perl -pe 's#https://(.+?):(.+?)@(.+?)/(.+?).git#git@\3:\4.git#' )
+  - git push "$SSH_URL" $PUSH_SPEC
+  
