@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 DEBUG=1
-VERSION=master-c16-g2005de5-b45
+VERSION=master-c17-g2ff081f-b52
+NPM_VERSION=1.17.52
 ## On MacOS need:
 ##   brew install coreutils && ln -s greadlink /usr/local/bin/readlink  &&   ln -s gmktemp /usr/local/bin/mktemp
 readonly mydir="$( dirname $(readlink -f ${BASH_SOURCE[0]} ) )"
@@ -126,6 +127,10 @@ do
          ;;
       --version)
          echo "$VERSION"
+         exit
+         ;;
+      --npm-version|--version-npm)
+         echo "$NPM_VERSION"
          exit
          ;;
       --*) echoerr "Unknown option: $1" ;;
