@@ -2,6 +2,7 @@
 set -euo pipefail
 DEBUG=1
 VERSION=000
+NPM_VERSION=0.0.0
 ## On MacOS need:
 ##   brew install coreutils && ln -s greadlink /usr/local/bin/readlink  &&   ln -s gmktemp /usr/local/bin/mktemp
 readonly mydir="$( dirname $(readlink -f ${BASH_SOURCE[0]} ) )"
@@ -52,6 +53,10 @@ do
          ;;
       --version)
          echo "$VERSION"
+         exit
+         ;;
+      --npm-version|--version-npm)
+         echo "$NPM_VERSION"
          exit
          ;;
       --*) echoerr "Unknown option: $1" ;;
