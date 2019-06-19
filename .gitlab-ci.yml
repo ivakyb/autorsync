@@ -1,24 +1,52 @@
 image: registry.gitlab.com/kyb/autorsync/autorsync-builder-alpine
-## alpine with bash git openssh-client
+## alpine with bash git openssh-client git-rev-label perl
+
+before_script:
+- function DEBUG { >&2 "$@" || true; }
 
 build:
   stage: build
   script:
+  - git checkout -B $CI_COMMIT_REF_NAME
   - sed -f ./build.sed autorsync.bash >autorsync
+  - REV_LABEL=$(git rev-label)
+  - echo -e '\e[1;37m' $REV_LABEL '\e[0m'
+  - sed -i "s#VERSION=000#VERSION=$REV_LABEL#" autorsync
   - chmod +x autorsync
   artifacts:
     paths: 
-    - "./autorsync"
+    - "autorsync"
 
-deploy:
+
+## --- STORE ARTIFACTS TO A DEDICATED BRANCH ---
+store_artifacts:
   stage: deploy
-  only:
-  - master
+  dependencies: 
+  - build
+  variables:
+    GIT_STRATEGY: none
+    GIT_USER_EMAIL: autorsync-ci@gitlab.com
+    GIT_USER_NAME: autorsync-ci
   script:
-  - git stash save -u -a autorsync
-  - git checkout artifacts/master
-  - git stash pop
-  - git add autorsync
-  - git commit -m"Build $(date)"
+  ## --------- GET REV_LABEL ----------
+  - REV_LABEL=$(./autorsync --version)
+  - echo -e $'\e[1;37m' "$REV_LABEL" $'\e[0m'
+  ## --------- URL --------------
   - echo "$KI" >/tmp/ki  &&  chmod 400 /tmp/ki
-  - GIT_SSH_COMMAND='ssh -oStrictHostKeyChecking=no -i /tmp/ki' git push git@gitlab.com:kyb/autorsync.git HEAD:artifacts/master
+  - export GIT_SSH_COMMAND="ssh -i/tmp/ki -oStrictHostKeyChecking=no"
+  - SSH_URL=$(echo "$CI_REPOSITORY_URL" | perl -pe 's#https://(.+?):(.+?)@(.+?)/(.+?).git#git@\3:\4.git#' )
+  ## ---------- CLONE, ADD and COMMIT ---------------
+  - git clone "$SSH_URL" --depth 1 --single-branch -b artifacts/$CI_COMMIT_REF_NAME ./artifacts  ||  { git init artifacts && git -C artifacts checkout --orphan artifacts/$CI_COMMIT_REF_NAME; }
+  #- for f in autorsync ;do F="$REV_LABEL-$f"; ln $f artifacts/$F || { echo >&2 "Forced ln $f"; ln -f $f artifacts/$F; } && git -C artifacts add $F; done
+  - ln -f autorsync artifacts/autorsync
+  - echo "$REV_LABEL" >artifacts/README.md
+  - cd artifacts
+  - git add .
+  - DEBUG git status 
+  - git config --global user.email "$GIT_USER_EMAIL"
+  - git config --global user.name "$GIT_USER_NAME"
+  - git commit -m"$REV_LABEL"
+  ## ------------ PUSH --------------
+  - git push "$SSH_URL" HEAD:artifacts/$CI_COMMIT_REF_NAME #ToDo use $CI_REPOSITORY_URL
+  ## ----------- EPILOG -----------
+  - echo "See artifacts at "$'\e[1;37m'"$CI_PROJECT_URL/tree/artifacts/$CI_COMMIT_REF_NAME"$'\e[0m'

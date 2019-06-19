@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 DEBUG=1
+VERSION=000
 ## On MacOS need:
 ##   brew install coreutils && ln -s greadlink /usr/local/bin/readlink  &&   ln -s gmktemp /usr/local/bin/mktemp
 readonly mydir="$( dirname $(readlink -f ${BASH_SOURCE[0]} ) )"
@@ -48,6 +49,10 @@ do
       --only-rx|--rx-only)
          USE_RX=y
          unset USE_TX
+         ;;
+      --version)
+         echo "$VERSION"
+         exit
          ;;
       --*) echoerr "Unknown option: $1" ;;
       *) if var_is_unset_or_empty SRC ;then
