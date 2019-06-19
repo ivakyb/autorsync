@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 DEBUG=1
+VERSION=master-c13-g1906ae1
 ## On MacOS need:
 ##   brew install coreutils && ln -s greadlink /usr/local/bin/readlink  &&   ln -s gmktemp /usr/local/bin/mktemp
 readonly mydir="$( dirname $(readlink -f ${BASH_SOURCE[0]} ) )"
@@ -123,6 +124,10 @@ do
          USE_RX=y
          unset USE_TX
          ;;
+      --version)
+         echo "$VERSION"
+         exit
+         ;;
       --*) echoerr "Unknown option: $1" ;;
       *) if var_is_unset_or_empty SRC ;then
             SRC+=("$1") 
@@ -142,6 +147,8 @@ var_is_set_not_empty DST || fatalerr "Destionation is not set"
 
 
 ## Initial sync
+##!!!!!!!!!! FIXME CANNOT SYNC TO EXISTING FOLDER
+##!!!!!!!!! IF DST IS DIR AND EXIST DST for this stage must go up one layer
 function initial_tx
 {
    echoinfo "Begin initial sync to container. Nothing will be deleted, only copy and update."
