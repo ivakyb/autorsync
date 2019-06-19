@@ -1,0 +1,28 @@
+{
+   "name": "autorsync",
+   "version": "$major.$commit.$build",
+   "description": "Life syncronization between two hosts using fswatch and rsync.",
+   "homepage": "https://gitlab.com/kyb/autorsync",
+   "keywords": [
+     "autorsync",
+     "rsync",
+     "filesync",
+     "fswatch",
+     "inotify"
+   ],
+   "author": {
+      "name": "Ivan Kuvaldin",
+      "url": "https://gitlab.com/kyb"
+   },
+   "repository": {
+     "type": "git",
+     "url": "https://gitlab.com/kyb/autorsync"
+   },
+   "main": "./autorsync",
+   "bin": {
+      "autorsync": "./autorsync"
+   },
+   "scripts": {
+      "build":"./BUILD"
+   }
+}
