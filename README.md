@@ -1,3 +1,5 @@
+[![](https://gitlab.com/kyb/autorsync/badges/master/pipeline.svg)](https://gitlab.com/kyb/autorsync/pipelines?scope=branches)
+
 # AutoRSync
 Able to monitor changes and synchronize files.
 
