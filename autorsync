@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 DEBUG=1
-VERSION=master-c15-gd58f6e5
+VERSION=master-c16-g2005de5-b45
 ## On MacOS need:
 ##   brew install coreutils && ln -s greadlink /usr/local/bin/readlink  &&   ln -s gmktemp /usr/local/bin/mktemp
 readonly mydir="$( dirname $(readlink -f ${BASH_SOURCE[0]} ) )"
