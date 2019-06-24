@@ -22,6 +22,7 @@ fi
 #REMOTE_PATH="rsync://localhost:10873/root/"
 unset SRC
 unset DST
+USE_INITIAL_TX=y
 USE_TX=y
 USE_RX=y
 
@@ -29,8 +30,18 @@ USE_RX=y
 while (( $# > 0 ))
 do
    case "$1" in
-      --initial-exclude=*) ;;
-      --exclude=*)  ;;
+      --initial-exclude=*)
+         echowarn "Option --initial-exclude is not implemented yet."
+         ;;
+      --no-initial-tx|--noinitialtx|--disable-initial-tx|--noitx)
+         unset USE_INITIAL_TX
+         ;;
+      --initial-tx|--enable-initial-tx)
+         USE_INITIAL_TX=y
+         ;;
+      --exclude=*)
+         echowarn "Option --exclude is not implemented yet."
+         ;;
       --tx|--use-tx)
          USE_TX=y
          ;;
@@ -160,7 +171,11 @@ period=1
 #echoinfo "Startning sync_on_change with period=$period"
 
 if var_is_set USE_TX ;then
-   initial_tx
+   if var_is_set USE_INITIAL_TX ;then
+      echoinfo "Begin initial_tx"
+      initial_tx
+      echoinfo "Done initial_tx"
+   fi
    echoinfo "Starting rsync_tx"
    rsync_tx  & pid_tx=$!
    echoinfo "pid_rsync_tx $pid_tx"
