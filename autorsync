@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 DEBUG=1
-VERSION=master-c19-g515cc12-b60
-NPM_VERSION=1.19.60
+VERSION=master-c20-gd62726e-b61
+NPM_VERSION=1.20.61
 ## On MacOS need:
 ##   brew install coreutils && ln -s greadlink /usr/local/bin/readlink  &&   ln -s gmktemp /usr/local/bin/mktemp
 readonly mydir="$( dirname $(readlink -f ${BASH_SOURCE[0]} ) )"
