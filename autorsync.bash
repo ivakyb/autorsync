@@ -71,6 +71,7 @@ do
          exit
          ;;
       --*) echoerr "Unknown option: $1" ;;
+      -*)  echoerr "Unknown option: $1" ;;
       *) if var_is_unset_or_empty SRC ;then
             SRC+=("$1") 
          elif var_is_unset_or_empty DST ;then
@@ -89,11 +90,13 @@ var_is_set_not_empty DST || fatalerr "Destionation is not set"
 
 
 ## Initial sync
-##!!!!!!!!!! FIXME CANNOT SYNC TO EXISTING FOLDER
-##!!!!!!!!! IF DST IS DIR AND EXIST DST for this stage must go up one layer
 function initial_tx
 {
    echoinfo "Begin initial sync to container. Nothing will be deleted, only copy and update."
+   local DST_HOST=$(cut -d: -f1 <<<$DST)
+   local DST_PATH=$(cut -d: -f2 <<<$DST)
+   local DST_PATH=$(ssh "$DST_HOST" bash -c "test; test -d \"$DST_PATH\" && echo \"$DST_PATH/..\" || echo \"$DST_PATH\"")
+   echodbg DST_PATH "$DST_PATH"
    rsync -aR --info=progress2  \
       --exclude-from=<( cat <<END
    .Spotlight-V100
@@ -104,7 +107,7 @@ function initial_tx
    build-*
 END
    ) \
-      "$SRC" "$DST"  &&
+      "$SRC" "$DST_HOST:$DST_PATH"  &&
       echoinfo "Initial sync to container done."  ||
       echowarn "Initial sync finished with errors/warnings."
 }
@@ -152,9 +155,9 @@ function rsync_tx
 
 function rsync_rx
 {
-   DST_HOST=$(cut -d: -f1 <<<$DST)
-   DST_PATH=$(cut -d: -f2 <<<$DST)
-   ssh $DST_HOST bash -x - <<END  | NORMALIZE_PATH="$(ssh "$DST_HOST" realpath "$DST_PATH")" rsync_cmd "$DST" "$SRC"
+   local DST_HOST=$(cut -d: -f1 <<<$DST)
+   local DST_PATH=$(cut -d: -f2 <<<$DST)
+   ssh $DST_HOST bash ${DEBUG:+-x} - <<END  | NORMALIZE_PATH="$(ssh "$DST_HOST" realpath "$DST_PATH")" rsync_cmd "$DST" "$SRC"
       set -euo pipefail
       mkdir -p "$DST_PATH"/.rsync.temp
       #trap "rm -rf $DST_PATH/.rsync.temp" exit
