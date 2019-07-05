@@ -67,5 +67,25 @@ function echoerr  { >/dev/stderr echo $'\e[0;31m'"ERR  $@"$'\e[0m'; }
 function fatalerr { echoerr "$@"; false; }
 alias die=fatalerr
 
+## Execute only for debug purposes command
+if var_is_set DEBUG  &&  [[ $DEBUG != 0 ]]  ;then 
+   function debug  { "$@" | catdbg; }
+else
+   function debug  { : "$@"; }  ## do nothing
+fi
+
+## Do not overwrite but append.
+function trap_append {
+   local handler="$1"
+   shift
+   for sigspec in "$@" ;do
+      local old_handler="$( trap -p "$sigspec" | perl -e "$/ = undef; <STDIN> =~ /'(.*?)'/s; print \$1;" )"
+      handler="$old_handler"$'\n'"$handler"
+      trap "$handler" "$sigspec"
+   done
+}
+
 function OnError {  caller | { read line file; echoerr "in $file:$line" >&2; };  }
+#set -E
 trap OnError ERR
+#set +E

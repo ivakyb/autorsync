@@ -14,6 +14,21 @@ build:
     paths: 
     - "autorsync"
 
+.test:
+  stage: test
+  dependencies:
+  script:
+  - git checkout -B $CI_COMMIT_REF_NAME
+  - apk add --no-cache rsync openssh perl
+  - /usr/bin/ssh-keygen -A
+  - /usr/sbin/sshd
+  - ssh-keygen -o -t rsa -b 4096 -f ~/.ssh/id_rsa -P ""
+  - cat ~/.ssh/id_rsa.pub >>~/.ssh/authorized_keys; chmod 600 ~/.ssh/authorized_keys
+  - ssh-keyscan -t rsa localhost >>~/.ssh/known_hosts
+  - ssh -vv -oPasswordAuthentication=no localhost echo test
+  - cd test
+  - bash -x ./test-x.bash
+  - bash -x ./test-live-changes.bash
 
 npm_publish:
   stage: deploy

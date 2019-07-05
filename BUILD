@@ -2,7 +2,7 @@
 set -eo pipefail
 
 BUILD_ID=${CI_PIPELINE_IID}
-if test -x ./autorsync ;then 
+if test -x ./autorsync  &&  ./autorsync --version ;then 
    BUILD_ID=$(./autorsync --version | sed -E 's#.*-b([0-9]+).*#\1#')
    let BUILD_ID++
 fi
