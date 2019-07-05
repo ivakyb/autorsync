@@ -6,7 +6,7 @@ shift || true
 
 
 mkdir -p test1a test1b
-trap "rm -rf $PWD/test1a $PWD/test1b; kill 0;" EXIT
+trap "rm -rf $PWD/test1a $PWD/test1b; #kill 0;" EXIT
 echo "Hello World" >test1a/hello_world
 autorsync test1a/ localhost:$PWD/test1b & ars_pid=$!
 assert kill -0 $ars_pid

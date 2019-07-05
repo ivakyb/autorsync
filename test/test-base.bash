@@ -9,7 +9,7 @@ AUTORSYNC="${1:-$mydir/../autorsync.bash}"
 shift || true
 
 assert(){
-   "$@" || { 
+   eval "$@" || { 
       excod=$?
       fatalerr "Assert FAILED: $@"
       return $excod

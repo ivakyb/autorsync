@@ -208,20 +208,21 @@ function initial_tx
 {
    echoinfo "Begin initial sync to container. Nothing will be deleted, only copy and update."
    #local DST_PATH=$(ssh "$DST_HOST" bash -c "test; test -d \"$DST_PATH\" && echo \"$DST_PATH/../$(basename "$SRC")\" || echo \"$DST_PATH\"")
+   ## If $SRC ends with / sync files in it, else sync SRC itself.
    if test "${SRC: -1}" = /  &&  test -d "$SRC" ;then
-      local FIND_FILES=
+      local FIND_FILES=y
       #echoinfo "${FIND_FILES+ --files-from=<(find "$SRC" | sed -E 's#'"$SRC"'/?##g')}"
       #find "$SRC" | sed -E 's#'"$SRC"'/?##g'
    fi
    #mkdir -p .rsync.temp  #mktemp -d 
-   #$SSH $DST_HOST mkdir -p "$DST_PATH"/.rsync.temp
+   $SSH $DST_HOST mkdir -p "$DST_PATH"/.rsync.temp #bash -xc "test -d '$DST_PATH' && mkdir -p '$DST_PATH'/.rsync.temp || mkdir -p '$DST_PATH'.rsync.temp"
    rsync --archive --relative --info=progress2  \
          --temp-dir=.rsync.temp  \
          --exclude-from=$EXCLUDES_LIST \
          ${RSYNC_PATH:+"$RSYNC_PATH"} \
          ${RSH:+"$RSH"} \
          "$SRC" "$DST" \
-         ${FIND_FILES+ --files-from=<(find "$SRC" | sed -E 's#'"$SRC"'/?##g')}  &&
+         ${FIND_FILES:+ --files-from=<(find "$SRC" | sed -E 's#'"$SRC"'/?##g')}  &&
       echoinfo "Initial sync to container done."  ||
       echowarn "Initial sync finished with errors/warnings."
          #"$SRC" "$DST_HOST:$DST_PATH" \

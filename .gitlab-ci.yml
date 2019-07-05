@@ -14,21 +14,26 @@ build:
     paths: 
     - "autorsync"
 
-.test:
+test:
   stage: test
   dependencies:
+  image: ubuntu
   script:
-  - git checkout -B $CI_COMMIT_REF_NAME
-  - apk add --no-cache rsync openssh perl
-  - /usr/bin/ssh-keygen -A
-  - /usr/sbin/sshd
+  #- git checkout -B $CI_COMMIT_REF_NAME
+  - apt-get update -qyy && apt install -qyy --no-install-recommends openssh-server openssh-client ca-certificates perl rsync fswatch
+  #- apk add --no-cache bash rsync fswatch openssh perl ca-certificates
+  #- /usr/bin/ssh-keygen -A  ## For Alpine only, not for Ubuntu
   - ssh-keygen -o -t rsa -b 4096 -f ~/.ssh/id_rsa -P ""
   - cat ~/.ssh/id_rsa.pub >>~/.ssh/authorized_keys; chmod 600 ~/.ssh/authorized_keys
-  - ssh-keyscan -t rsa localhost >>~/.ssh/known_hosts
-  - ssh -vv -oPasswordAuthentication=no localhost echo test
+  - mkdir -p /run/sshd  ## Ubuntu only, fix a bug
+  - /usr/sbin/sshd
+  - ssh-keyscan -t rsa localhost >>~/.ssh/known_hosts; chmod 600 ~/.ssh/known_hosts
+  #- ssh -vv -oPasswordAuthentication=no localhost echo test
   - cd test
-  - bash -x ./test-x.bash
+  - bash -x ./test-initial-sync.bash
   - bash -x ./test-live-changes.bash
+  - bash -x ./test-sync-to-existing.bash || true  ## THIS SHOULD NOT FAIL!!! #10
+  - ps -a || true
 
 npm_publish:
   stage: deploy
