@@ -173,8 +173,9 @@ if test $USE_DEFAULT_EXCLUDES_LIST = y ;then
 .fseventsd
 .rsync.temp/
 .git
-.git/index.lock
 .git/FETCH_HEAD
+.git/index.lock
+.git/modules/*/index.lock
 .DS_Store
 .Spotlight-V100
 .TemporaryItemss
@@ -197,8 +198,7 @@ function excludes_for_fswatch
       s#\.#\\\.#g
       s#\*#.*#g
       s#\?#.?#g
-      s#^#--exclude \'#g
-      s#$#\'#g
+      s#^#--exclude #g
 END
 )
 }
@@ -237,7 +237,7 @@ function fswatch_cmd
          --latency ${period:=1} \
          --recursive \
          --event Created --event Updated --event Removed --event Renamed --event AttributeModified --event OwnerModified \
-         $(excludes_for_fswatch | tr '\n' ' ')
+         $(excludes_for_fswatch)
          ##--exclude '.*/index.lock' --exclude '\.idea/.*' --exclude '.*___jb_old___' --exclude '.*___jb_tmp___' \
          ##--exclude '\.DS_Store' --exclude '\.git/FETCH_HEAD' --exclude '\.rsync\.temp/.*'
          #--event" "{Created,Updated,Removed,Renamed,AttributeModified} \   
