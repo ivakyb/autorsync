@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-DEBUG=1
+DEBUG={DEBUG:-1}
+
 VERSION=000
 NPM_VERSION=0.0.0
 
@@ -63,6 +64,9 @@ do
       --help)
          echowarn "Option --help is under construction!"
          exit
+         ;;
+      --period=*)
+         period="${1##--period=}"
          ;;
       --exclude=*)
          echo "$1" >>$EXCLUDES_LIST
@@ -136,18 +140,17 @@ do
          exit
          ;;
       --install)
-         echowarn "Option --install is under construction!"
+         echowarn "Option --install is under construction! Refer to git-rev-label for impl."
          ;;
       --install-symlink)
-         echowarn "Option --install-symlink is under construction!"
+         echowarn "Option --install-symlink is under construction! Refer to git-rev-label for impl."
          ;;
       --install-symlink)
-         echowarn "Option --install-symlink is under construction!"
+         echowarn "Option --install-symlink is under construction! Refer to git-rev-label for impl."
          ;;
       -x) set -x ;;
       +x) set +x ;;
-      --*) echowarn "Unknown option: $1" ;;
-      -*)  echowarn "Unknown option: $1" ;;
+      -*|--*) fatalerr "Unknown option: $1" ;;
       *) if var_is_unset_or_empty SRC ;then
             SRC+=("$1") 
          elif var_is_unset_or_empty DST ;then
@@ -234,7 +237,7 @@ function fswatch_cmd
    ## See https://github.com/emcrisostomo/fswatch/issues/212#issuecomment-473369919 for full list of events
    EndOfTransmittion=$'\x04'
    fswatch "$1" --batch-marker=$'\x04' \
-         --latency ${period:=1} \
+         ${period:+ --latency $period} \
          --recursive \
          --event Created --event Updated --event Removed --event Renamed --event AttributeModified --event OwnerModified \
          $(excludes_for_fswatch)
@@ -311,7 +314,7 @@ END
 }
 
 ## Sync on change
-period=1
+test $(uname -s) == Darwin && period=0.5 || period=1
 #echoinfo "Startning sync_on_change with period=$period"
 
 DST_HOST=$(cut -d: -f1 <<<$DST)
