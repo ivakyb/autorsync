@@ -8,7 +8,18 @@ if test -x ./autorsync  &&  ./autorsync --version ;then
 fi
 BUILD_ID=${BUILD_ID:=1}  ## fall back to 1
 
-sed -f ./build.sed autorsync.bash >autorsync
+sed autorsync.bash >autorsync -f-<<'END'
+{
+   /^source \$mydir/ {
+      a
+      a ### BEGIN utils.bash ###
+      r utils.bash
+      a ### END utils.bash ###
+      a 
+      d
+   }
+}
+END
 VERSION="$(git rev-label --format='$refname-c$count-g$short'-b$BUILD_ID\$_dirty )"
 sed -i "s#VERSION=000#VERSION=$VERSION#" autorsync
 
