@@ -18,3 +18,11 @@ assert(){
 autorsync(){
    "$AUTORSYNC" "$@"
 }
+
+alias diffq='diff -q '
+
+assert_diff(){
+   assert diff -q test1a/"$1" test1b/"$1"
+}
+
+trap_append clean_up EXIT
