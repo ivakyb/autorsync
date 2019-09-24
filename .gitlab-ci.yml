@@ -14,11 +14,12 @@ build:
     paths: 
     - "autorsync"
 
-test:
-  stage: test
-  dependencies:
+test_before_build:
+  stage: build
   image: ubuntu
-  script:
+  variables:
+    AUTORSYNC: "./autorsync.bash"
+  script: &test_script
   #- git checkout -B $CI_COMMIT_REF_NAME
   - apt-get update -qyy && apt install -qyy --no-install-recommends openssh-server openssh-client ca-certificates perl rsync fswatch psmisc
   #- apk add --no-cache bash rsync fswatch openssh perl ca-certificates
@@ -31,6 +32,17 @@ test:
   #- ssh -vv -oPasswordAuthentication=no localhost echo test
   - ./test-autorsync.bash
   - ps -aux || true
+      
+    
+test:
+  stage: test
+  dependencies: 
+  - build
+  image: ubuntu
+  variables:
+    AUTORSYNC: ./autorsync
+  script: *test_script
+  
 
 npm_publish:
   stage: deploy
