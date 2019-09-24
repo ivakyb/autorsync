@@ -146,9 +146,7 @@ function live_changes {
    }
 
    echo "Hello World" >test1a/hello_world
-   autorsync --use-rx test1a/ localhost:$PWD/test1b & ars_pid=$!
-   clean_up(){ kill_sure $ars_pid; }
-   sleep 0.3 && assert kill -0 $ars_pid
+   start_autorsync --use-rx test1a/ localhost:$PWD/test1b
    sleep 1.2  ## wait for inital sync
 
    ## Test live changes a->b
@@ -167,8 +165,6 @@ function live_changes {
    assert_diff i_love_world-b
    
    assert diff -q test1a/hello_world test1b/hello_world
-
-   debug jobs
 }
 
 

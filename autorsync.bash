@@ -359,7 +359,7 @@ fi
 #debug jobs -l
 #echodbg "============ pstree \$\$ =============="
 #debug pstree $$
-wait -f || true
+wait || true
 echodbg "---------------------------------------------"
 echoinfo "autorsync done."
 
