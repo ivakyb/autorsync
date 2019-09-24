@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
+shopt -u failglob
+shopt -s lastpipe #inherit_errexit
 DEBUG={DEBUG:-1}
 
 VERSION=000
@@ -7,7 +9,7 @@ NPM_VERSION=0.0.0
 
 ## KNOWN ISSUES
 ## * fswatch on MacOS does not detect deleted folder (CHECK)
-## * may need to set max number of open file descriptors ulimit -n 10000
+## * may need to set max number of open file descriptors ulimit -n 1170
 ## * fswatch is not a good solution for linux due to Error: Event queue overflow. and long delays. Try inotify-hookable or inotifywait
 ## * NEED periodic full update
 ## * Works only with remote DST
@@ -42,7 +44,7 @@ readonly mydir="$( dirname $(readlink -f ${BASH_SOURCE[0]} ) )"
 
 source $mydir/utils.bash
 
-trap 'ps=$(jobs -p); ${ps:+ kill $ps} || true' INT HUP EXIT
+trap_append 'jobs; ps=$(jobs -p); ${ps:+ kill $ps} || true; jobs' INT HUP EXIT
 #trap "kill -hup 0" hup
 
 unset SRC
@@ -50,7 +52,7 @@ unset DST
 USE_INITIAL_TX=y
 USE_TX=y
 USE_RX=
-RSYNC_PATH=
+RSYNC_PATH=  ## From man rsync: --rsync-path=PROGRAM    specify the rsync to run on remote machine
 RSH=
 SSH=ssh
 
@@ -102,6 +104,10 @@ do
       --rx|--use-rx)
          USE_RX=y
          ;;
+      --rxtx|--txrx)
+         USE_TX=y
+         USE_RX=y
+         ;;
       --no-tx|--notx)
          unset USE_TX
          ;;
@@ -125,11 +131,11 @@ do
          echowarn "Option --no-remove-rsync-temp is under construction!"
          ;;
       --rsh=*)
-         RSH="--rsh=${1#*=}"
+         RSH="${1#*=}"
          SSH="${1#*=}"
          ;;
       --rsync-path=*)
-         RSYNC_PATH="--rsync-path=${1#*=}"
+         RSYNC_PATH="${1#*=}"
          ;;
       --version)
          echo "$VERSION"
@@ -198,6 +204,7 @@ fi
 function excludes_for_fswatch 
 {
    sed $EXCLUDES_LIST -f <(cat <<'END'
+      /^#/d
       s#\.#\\\.#g
       s#\*#.*#g
       s#\?#.?#g
@@ -222,8 +229,8 @@ function initial_tx
    rsync --archive --relative --info=progress2  \
          --temp-dir=.rsync.temp  \
          --exclude-from=$EXCLUDES_LIST \
-         ${RSYNC_PATH:+"$RSYNC_PATH"} \
-         ${RSH:+"$RSH"} \
+         ${RSYNC_PATH:+"--rsync-path=$RSYNC_PATH"} \
+         ${RSH:+"--rsh=$RSH"} \
          "$SRC" "$DST" \
          ${FIND_FILES:+ --files-from=<(find "$SRC" | sed -E 's#'"$SRC"'/?##g')}  &&
       echoinfo "Initial sync to container done."  ||
@@ -264,11 +271,12 @@ function rsync_cmd
       echodbg "$(test "$1" == "$SRC" && echo "L==>R" || echo "L<==R") $REPLY"
       echo "$REPLY" >$ff #| cut -d' ' -f1 >$ff
       normalize_path "$NORMALIZE_PATH" -i $ff
+      echodbg ============ "RSYNC_PATH=$RSYNC_PATH"
       rsync --archive --relative --delete --delete-missing-args  \
-            --info=progress2 --files-from=$ff --temp-dir=.rsync.temp  \
-            --exclude='.rsync.temp/*' \
-            ${RSYNC_PATH:+"$RSYNC_PATH"} \
-            ${RSH:+"$RSH"} \
+            --info=progress2 --files-from=$ff  \
+            --temp-dir=.rsync.temp --exclude='.rsync.temp/*' \
+            ${RSYNC_PATH:+"--rsync-path=$RSYNC_PATH"} \
+            ${RSH:+"--rsh=$RSH"} \
             "$@"  \
          || echowarn "Failed to sync: $(cat $ff)"
    done
@@ -302,8 +310,10 @@ function rsync_rx
       ulimit -n 10000
       fswatch_cmd "$DST_PATH"
    }
-   $SSH $DST_HOST bash -x - <<END  | NORMALIZE_PATH="$($SSH "$DST_HOST" realpath "$DST_PATH")" rsync_cmd "$DST" "$SRC"
+   $SSH $DST_HOST ${REMOTE_PATH:+$REMOTE_PATH/}bash -<<END  | NORMALIZE_PATH="$($SSH "$DST_HOST" ${REMOTE_PATH:+$REMOTE_PATH/}realpath "$DST_PATH")" rsync_cmd "$DST" "$SRC"
       set -euo pipefail
+      if test `uname` == Darwin ;then export PATH="/usr/local/bin:$PATH" ;fi
+      $(cat $mydir/utils.bash)
       DST_PATH="$DST_PATH"  period=$period  DEBUG=$DEBUG
       EXCLUDES_LIST=\$(mktemp)
       echo "$(cat $EXCLUDES_LIST)" >\$EXCLUDES_LIST
@@ -319,6 +329,9 @@ test $(uname -s) == Darwin && period=0.5 || period=1
 
 DST_HOST=$(cut -d: -f1 <<<$DST)
 DST_PATH=$(cut -d: -f2 <<<$DST)
+REMOTE_UNAME="$($SSH $DST_HOST uname)"
+var_is_unset_or_empty REMOTE_PATH && test $REMOTE_UNAME = Darwin && REMOTE_PATH=/usr/local/bin
+var_is_unset_or_empty RSYNC_PATH  && test $REMOTE_UNAME = Darwin && RSYNC_PATH="${REMOTE_PATH:+$REMOTE_PATH/}rsync"
 
 if var_is_set_not_empty USE_TX ;then
    if var_is_set USE_INITIAL_TX ;then
@@ -328,7 +341,7 @@ if var_is_set_not_empty USE_TX ;then
    fi
    echoinfo "Starting rsync_tx"
    rsync_tx  & pid_tx=$!
-   sleep 0.2 && kill -0 $pid_tx  ## Check process is running successfully
+   sleep 0.2 && kill -0 $pid_tx 2>&- ||  fatalerr "rsync_tx $pid_tx failed to start"  ## Check process is running successfully
    echoinfo "pid_rsync_tx $pid_tx"
    #trap_append "kill $pid_tx" EXIT
 fi
@@ -336,14 +349,18 @@ fi
 if var_is_set_not_empty USE_RX ;then
    echoinfo "Starting rsync_rx"
    rsync_rx  & pid_rx=$!
-   sleep 0.2 && kill -0 $pid_rx  ## Check process is running successfully
+   sleep 0.2 && kill -0 $pid_rx 2>&- ||  fatalerr "rsync_rx $pid_rx failed to start" ## Check process is running successfully
    echoinfo "pid_rsync_rx $pid_rx"
    #trap_append "kill $pid_rx" EXIT
 fi
 
-#debug jobs
+## Fix problem: subprocesses do not exit with main
+#echodbg "============ jobs -l =============="
+#debug jobs -l
+#echodbg "============ pstree \$\$ =============="
 #debug pstree $$
 wait || true
+echodbg "---------------------------------------------"
 echoinfo "autorsync done."
 
 ### Wait for jobs exit, if interrupted try normally close them, if they fail to close during 2 seconds, force kill.

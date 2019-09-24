@@ -14,13 +14,14 @@ build:
     paths: 
     - "autorsync"
 
-test:
-  stage: test
-  dependencies:
+test_before_build:
+  stage: build
   image: ubuntu
-  script:
+  variables:
+    AUTORSYNC: "./autorsync.bash"
+  script: &test_script
   #- git checkout -B $CI_COMMIT_REF_NAME
-  - apt-get update -qyy && apt install -qyy --no-install-recommends openssh-server openssh-client ca-certificates perl rsync fswatch
+  - apt-get update -qyy && apt install -qyy --no-install-recommends openssh-server openssh-client ca-certificates perl rsync fswatch psmisc
   #- apk add --no-cache bash rsync fswatch openssh perl ca-certificates
   #- /usr/bin/ssh-keygen -A  ## For Alpine only, not for Ubuntu
   - ssh-keygen -o -t rsa -b 4096 -f ~/.ssh/id_rsa -P ""
@@ -29,11 +30,19 @@ test:
   - /usr/sbin/sshd
   - ssh-keyscan -t rsa localhost >>~/.ssh/known_hosts; chmod 600 ~/.ssh/known_hosts
   #- ssh -vv -oPasswordAuthentication=no localhost echo test
-  - cd test
-  - bash -x ./test-initial-sync.bash
-  - bash -x ./test-live-changes.bash
-  - bash -x ./test-sync-to-existing.bash || true  ## THIS SHOULD NOT FAIL!!! #10
-  - ps -a || true
+  - ./test-autorsync.bash
+  - ps -aux || true
+      
+    
+test:
+  stage: test
+  dependencies: 
+  - build
+  image: ubuntu
+  variables:
+    AUTORSYNC: ./autorsync
+  script: *test_script
+  
 
 npm_publish:
   stage: deploy
