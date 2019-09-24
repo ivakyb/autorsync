@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
+shopt -u failglob
+shopt -s lastpipe #inherit_errexit
 DEBUG={DEBUG:-1}
 
-VERSION=master-c23-g4325ff4-b110
-NPM_VERSION=1.23.110
+VERSION=master-c24-g8047738-b131
+NPM_VERSION=1.24.131
 
 ## KNOWN ISSUES
 ## * fswatch on MacOS does not detect deleted folder (CHECK)
-## * may need to set max number of open file descriptors ulimit -n 10000
+## * may need to set max number of open file descriptors ulimit -n 1170
 ## * fswatch is not a good solution for linux due to Error: Event queue overflow. and long delays. Try inotify-hookable or inotifywait
 ## * NEED periodic full update
 ## * Works only with remote DST
@@ -50,7 +52,15 @@ readonly mydir="$( dirname $(readlink -f ${BASH_SOURCE[0]} ) )"
 ## USAGE: 
 ##   source utils.bash
 
-set -euo pipefail #,errtrace,nounset  # -e == -o errtrace. Also consider to use -ET
+set -eETuo errexit -o nounset -o pipefail #-o errtrace -o functrace
+shopt -s expand_aliases lastpipe #gnu_errfmt globstar huponexit inherit_errexit localvar_inherit
+
+#[[ ${BASH_SOURCE:-} != "" ]] && {
+#   BASH_SOURCE=( EMPTY_BASH_SOURCE )
+#}
+
+#export PS4='+ $(date "+%F_%T") ${FUNCNAME[0]:-NOFUNC}() $BASH_SOURCE:${BASH_LINENO[0]} +  '  ## From https://stackoverflow.com/a/22617858
+export PS4=$'+\e[33m ${BASH_SOURCE[0]:-nofile}:${BASH_LINENO[0]:-noline} ${FUNCNAME[0]:-nofunc}()\e[0m  '
 
 var_is_set(){
    declare -rn var=$1
@@ -68,6 +78,8 @@ var_is_unset_or_empty(){
    declare -rn var=$1
    test -z ${var:+x}
 }
+
+[[ ${BASH_SOURCE:-} != "" ]] && SRCDIR="$(realpath $(dirname "${BASH_SOURCE[-1]}"))"
 
 is_sourced(){
    [[ "${BASH_SOURCE[0]}" != "${0}" ]]
@@ -92,13 +104,14 @@ function colordbg {
 
 function echomsg                  { echo $'\e[1;37m'"$@"$'\e[0m'; }
 if var_is_set DEBUG  &&  [[ $DEBUG != 0 ]]  ;then 
+   #shopt -s extdebug
    function echodbg  { >/dev/stderr echo $'\e[0;36m'"DBG  $@"$'\e[0m'; }
    function catdbg   { >/dev/stderr echo $'\e[0;36m'; cat $@; echo $'\e[0m'; }
 else
    function echodbg  { :; }  ## do nothing
 fi
 if var_is_unset NOINFO  ||  [[ $NOWARN == 0 ]]  ;then 
-   function echoinfo { >/dev/stderr echo $'\e[1;37m'"INFO $@"$'\e[0m'; }
+   function echoinfo { >/dev/stderr echo $'\e[0;37m'"INFO $@"$'\e[0m'; }
 else
    function echoinfo { :; }  ## do nothing
 fi
@@ -108,8 +121,28 @@ else
    function echowarn { :; }  ## do nothing
 fi
 function echoerr  { >/dev/stderr echo $'\e[0;31m'"ERR  $@"$'\e[0m'; }
-function fatalerr { echoerr "$@"; false; }
+function fatalerr { 
+   echoerr "$@"
+   stacktrace2 2
+   exit 1
+}
 alias die=fatalerr
+
+function stacktrace { 
+   local i=1
+   while caller $i | read line func file; do 
+      echodbg "[$i] $file:$line $func()"
+      ((i++))
+   done
+}
+function stacktrace2 {
+   local i=${1:-1} size=${#BASH_SOURCE[@]}
+   ((i<size)) && echodbg "STACKTRACE"
+   for ((; i < size-1; i++)) ;do  ## -1 to exclude main()
+      ((frame=${#BASH_SOURCE[@]}-i-2 ))
+      echodbg "[$frame] ${BASH_SOURCE[$i]:-}:${BASH_LINENO[$i]} ${FUNCNAME[$i+1]}()"
+   done
+}
 
 ## Execute only for debug purposes command
 if var_is_set DEBUG  &&  [[ $DEBUG != 0 ]]  ;then 
@@ -129,14 +162,38 @@ function trap_append {
    done
 }
 
-function OnError {  caller | { read line file; echoerr "in $file:$line" >&2; };  }
-#set -E
+array(){
+   array=$1; shift; "$@"
+}
+contains_element(){
+   declare -n __arr=$array
+   local elem
+   for elem in "${__arr[@]}" ;do [[ "$elem" == "$1" ]] && return 0; done
+   return 1
+}
+
+# for_each(){
+#    for elem in ${!1[@]} ;do
+#       eval "$@" $testname
+#    done
+# }
+
+kill_sure(){
+   kill -TERM "$@" &>/dev/null ||  return 0   ## Already dead
+   sleep 0.3
+   if kill -0 "$@" &>/dev/null ;then
+      echowarn "Force kill $1"
+      kill -9 "$@" 2>&-
+   fi
+}
+
+#function OnError {  caller | { read line file; echoerr "in $file:$line" >&2; };  }
+OnError(){ stacktrace; }
 trap OnError ERR
-#set +E
 ### END utils.bash ###
 
 
-trap 'ps=$(jobs -p); ${ps:+ kill $ps} || true' INT HUP EXIT
+trap_append 'jobs; ps=$(jobs -p); ${ps:+ kill $ps} || true; jobs' INT HUP EXIT
 #trap "kill -hup 0" hup
 
 unset SRC
@@ -144,7 +201,7 @@ unset DST
 USE_INITIAL_TX=y
 USE_TX=y
 USE_RX=
-RSYNC_PATH=
+RSYNC_PATH=  ## From man rsync: --rsync-path=PROGRAM    specify the rsync to run on remote machine
 RSH=
 SSH=ssh
 
@@ -196,6 +253,10 @@ do
       --rx|--use-rx)
          USE_RX=y
          ;;
+      --rxtx|--txrx)
+         USE_TX=y
+         USE_RX=y
+         ;;
       --no-tx|--notx)
          unset USE_TX
          ;;
@@ -219,11 +280,11 @@ do
          echowarn "Option --no-remove-rsync-temp is under construction!"
          ;;
       --rsh=*)
-         RSH="--rsh=${1#*=}"
+         RSH="${1#*=}"
          SSH="${1#*=}"
          ;;
       --rsync-path=*)
-         RSYNC_PATH="--rsync-path=${1#*=}"
+         RSYNC_PATH="${1#*=}"
          ;;
       --version)
          echo "$VERSION"
@@ -292,6 +353,7 @@ fi
 function excludes_for_fswatch 
 {
    sed $EXCLUDES_LIST -f <(cat <<'END'
+      /^#/d
       s#\.#\\\.#g
       s#\*#.*#g
       s#\?#.?#g
@@ -316,8 +378,8 @@ function initial_tx
    rsync --archive --relative --info=progress2  \
          --temp-dir=.rsync.temp  \
          --exclude-from=$EXCLUDES_LIST \
-         ${RSYNC_PATH:+"$RSYNC_PATH"} \
-         ${RSH:+"$RSH"} \
+         ${RSYNC_PATH:+"--rsync-path=$RSYNC_PATH"} \
+         ${RSH:+"--rsh=$RSH"} \
          "$SRC" "$DST" \
          ${FIND_FILES:+ --files-from=<(find "$SRC" | sed -E 's#'"$SRC"'/?##g')}  &&
       echoinfo "Initial sync to container done."  ||
@@ -358,11 +420,12 @@ function rsync_cmd
       echodbg "$(test "$1" == "$SRC" && echo "L==>R" || echo "L<==R") $REPLY"
       echo "$REPLY" >$ff #| cut -d' ' -f1 >$ff
       normalize_path "$NORMALIZE_PATH" -i $ff
+      echodbg ============ "RSYNC_PATH=$RSYNC_PATH"
       rsync --archive --relative --delete --delete-missing-args  \
-            --info=progress2 --files-from=$ff --temp-dir=.rsync.temp  \
-            --exclude='.rsync.temp/*' \
-            ${RSYNC_PATH:+"$RSYNC_PATH"} \
-            ${RSH:+"$RSH"} \
+            --info=progress2 --files-from=$ff  \
+            --temp-dir=.rsync.temp --exclude='.rsync.temp/*' \
+            ${RSYNC_PATH:+"--rsync-path=$RSYNC_PATH"} \
+            ${RSH:+"--rsh=$RSH"} \
             "$@"  \
          || echowarn "Failed to sync: $(cat $ff)"
    done
@@ -396,8 +459,10 @@ function rsync_rx
       ulimit -n 10000
       fswatch_cmd "$DST_PATH"
    }
-   $SSH $DST_HOST bash -x - <<END  | NORMALIZE_PATH="$($SSH "$DST_HOST" realpath "$DST_PATH")" rsync_cmd "$DST" "$SRC"
+   $SSH $DST_HOST ${REMOTE_PATH:+$REMOTE_PATH/}bash -<<END  | NORMALIZE_PATH="$($SSH "$DST_HOST" ${REMOTE_PATH:+$REMOTE_PATH/}realpath "$DST_PATH")" rsync_cmd "$DST" "$SRC"
       set -euo pipefail
+      if test `uname` == Darwin ;then export PATH="/usr/local/bin:$PATH" ;fi
+      $(cat $mydir/utils.bash)
       DST_PATH="$DST_PATH"  period=$period  DEBUG=$DEBUG
       EXCLUDES_LIST=\$(mktemp)
       echo "$(cat $EXCLUDES_LIST)" >\$EXCLUDES_LIST
@@ -413,6 +478,9 @@ test $(uname -s) == Darwin && period=0.5 || period=1
 
 DST_HOST=$(cut -d: -f1 <<<$DST)
 DST_PATH=$(cut -d: -f2 <<<$DST)
+REMOTE_UNAME="$($SSH $DST_HOST uname)"
+var_is_unset_or_empty REMOTE_PATH && test $REMOTE_UNAME = Darwin && REMOTE_PATH=/usr/local/bin
+var_is_unset_or_empty RSYNC_PATH  && test $REMOTE_UNAME = Darwin && RSYNC_PATH="${REMOTE_PATH:+$REMOTE_PATH/}rsync"
 
 if var_is_set_not_empty USE_TX ;then
    if var_is_set USE_INITIAL_TX ;then
@@ -422,7 +490,7 @@ if var_is_set_not_empty USE_TX ;then
    fi
    echoinfo "Starting rsync_tx"
    rsync_tx  & pid_tx=$!
-   sleep 0.2 && kill -0 $pid_tx  ## Check process is running successfully
+   sleep 0.2 && kill -0 $pid_tx 2>&- ||  fatalerr "rsync_tx $pid_tx failed to start"  ## Check process is running successfully
    echoinfo "pid_rsync_tx $pid_tx"
    #trap_append "kill $pid_tx" EXIT
 fi
@@ -430,14 +498,18 @@ fi
 if var_is_set_not_empty USE_RX ;then
    echoinfo "Starting rsync_rx"
    rsync_rx  & pid_rx=$!
-   sleep 0.2 && kill -0 $pid_rx  ## Check process is running successfully
+   sleep 0.2 && kill -0 $pid_rx 2>&- ||  fatalerr "rsync_rx $pid_rx failed to start" ## Check process is running successfully
    echoinfo "pid_rsync_rx $pid_rx"
    #trap_append "kill $pid_rx" EXIT
 fi
 
-#debug jobs
+## Fix problem: subprocesses do not exit with main
+#echodbg "============ jobs -l =============="
+#debug jobs -l
+#echodbg "============ pstree \$\$ =============="
 #debug pstree $$
 wait || true
+echodbg "---------------------------------------------"
 echoinfo "autorsync done."
 
 ### Wait for jobs exit, if interrupted try normally close them, if they fail to close during 2 seconds, force kill.
