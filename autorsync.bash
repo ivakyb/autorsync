@@ -179,7 +179,7 @@ var_is_set_not_empty DST || fatalerr "Destionation is not set"
 USE_DEFAULT_EXCLUDES_LIST=${USE_DEFAULT_EXCLUDES_LIST:=y}  ## if unset or empty, set to default value 'y'
 if test $USE_DEFAULT_EXCLUDES_LIST = y ;then
    cat >$EXCLUDES_LIST <<END
-#.fseventsd
+.fseventsd
 .rsync.temp/
 .git
 .git/FETCH_HEAD

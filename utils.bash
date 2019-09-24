@@ -144,4 +144,3 @@ kill_sure(){
 #function OnError {  caller | { read line file; echoerr "in $file:$line" >&2; };  }
 OnError(){ stacktrace; }
 trap OnError ERR
-

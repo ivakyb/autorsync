@@ -62,7 +62,7 @@ run_test(){ local testname=$1;
    if (
       #status $testname running
       workdir=$(mktemp -d)
-      trap_append "echodbg END $testname; rm -r $workdir" EXIT
+      trap_append "rm -r $workdir" EXIT
       cd $workdir
       $testname
    );then
@@ -227,7 +227,13 @@ debug tree tx_local rx_remote
 #echodbg ----- pgrep; debug pgrep -P $$
 #echodbg ----- pstree; debug pstree $$
 }
-## ToDo the same for live sync
+
+#############################################
+## Test 5. TODO
+## Synchronize to existing directory. Live sync
+## If SRC ends with / sync files in it, else sync SRC itself.
+#############################################
+
 
 
 #############################################
@@ -240,7 +246,12 @@ execute_testcases
 #run_test initial_sync_with_slash
 
 ## ToDo
-## Report number of failed, succeded and skiped testcases
 ## Ability to stop on first error  --first-error
 ## Ability for parallel running    --parallel=`nproc`|-j5
 report_results
+
+if ((FAILED<=127)) ;then
+   exit $FAILED
+else 
+   exit 127
+fi
