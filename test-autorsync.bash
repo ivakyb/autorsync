@@ -36,6 +36,9 @@ assert_file_contents_are_same(){
 
 
 declare -A TestcasesDescriptions TestcasesStatuses
+SUCCEDED=0
+FAILED=0
+SKIPPED=0
 
 declare_test(){ local name="$1" description="${2:-}" declared=declared
    ## Assert arrays of Testcases does not already contain $name
@@ -48,13 +51,14 @@ declare_test(){ local name="$1" description="${2:-}" declared=declared
 
 status(){ local name=$1 status="$2"
    TestcasesStatuses+=( [$name]="$status" )
-#   declare -gA Testcase_$name=( [status]=$status )
+#   Testcase_$name+=( [status]="$status" )
 }
 
 run_test(){ local testname=$1; 
 #assert_warn (( $#==1 ))
    echomsg --- $testname \""${TestcasesDescriptions[$testname]}"\"
    status $testname started
+   SKIPFILE=$(mktemp)
    if (
       #status $testname running
       workdir=$(mktemp -d)
@@ -62,12 +66,22 @@ run_test(){ local testname=$1;
       cd $workdir
       $testname
    );then
-      TestcasesStatuses+=( [$testname]=$? )
-      echo "--- $testname "$'\e[1;32m'"SUCCEEDED"$'\e[0m'
+      if [[ $(cat $SKIPFILE) = $testname ]]; then 
+         ((SKIPPED++)) ||true
+         status $testname skipped
+         echo "--- $testname "$'\e[1;37m'"SKIPPED"$'\e[0m'
+      else
+         ((SUCCEDED++)) ||true
+         status $testname succeded
+         echo "--- $testname "$'\e[1;32m'"SUCCEEDED"$'\e[0m'
+      fi
    else
-      TestcasesStatuses+=( [$testname]=$? )
+      ((FAILED++)) ||true
+      status $testname "failed $?"
+      #TestcasesStatuses+=( [$testname]=$? )
       echo "--- $testname "$'\e[1;31m'"FAILED"$'\e[0m'
    fi
+   rm $SKIPFILE
 }
 
 for_each_testcase(){
@@ -94,7 +108,13 @@ start_autorsync(){
    #echoinfo "AutoRSync started with PID $autorsync_pid"
 }
 
-alias skip='return 0'
+alias skip='echo "$testname">$SKIPFILE; return 0'
+
+report_results(){
+   echo -e "\e[31mFAILED \e[1;31m$FAILED\e[0m, \e[32mSUCCEDED \e[1;32m$SUCCEDED\e[0m, \e[37mSKIPPED \e[1;37m$SKIPPED\e[0m"
+   #echo "Failed: ${TestcasesFailed}"
+   #echo "Skipped: ${TestcasesSkiped}"
+}
 
 
 #############################################
@@ -223,3 +243,4 @@ execute_testcases
 ## Report number of failed, succeded and skiped testcases
 ## Ability to stop on first error  --first-error
 ## Ability for parallel running    --parallel=`nproc`|-j5
+report_results
