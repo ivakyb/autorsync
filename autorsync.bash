@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 shopt -u failglob
-shopt -s lastpipe #inherit_errexit
+shopt -s lastpipe huponexit #inherit_errexit
 DEBUG={DEBUG:-1}
 
 VERSION=000
@@ -44,7 +44,7 @@ readonly mydir="$( dirname $(readlink -f ${BASH_SOURCE[0]} ) )"
 
 source $mydir/utils.bash
 
-trap_append 'jobs; ps=$(jobs -p); ${ps:+ kill $ps} || true; jobs' INT HUP EXIT
+trap_append 'set -x; jobs; ps=$(jobs -p); ${ps:+ kill $ps} || true; jobs' INT HUP EXIT
 #trap "kill -hup 0" hup
 
 unset SRC
@@ -68,7 +68,7 @@ do
          exit
          ;;
       --period=*)
-         period="${1##--period=}"
+         period="${1#--period=}"
          ;;
       --exclude=*)
          echo "$1" >>$EXCLUDES_LIST
@@ -226,17 +226,18 @@ function initial_tx
    fi
    #mkdir -p .rsync.temp  #mktemp -d 
    $SSH $DST_HOST mkdir -p "$DST_PATH"/.rsync.temp #bash -xc "test -d '$DST_PATH' && mkdir -p '$DST_PATH'/.rsync.temp || mkdir -p '$DST_PATH'.rsync.temp"
-   rsync --archive --relative --info=progress2  \
+   if rsync --archive --relative --info=progress2  \
          --temp-dir=.rsync.temp  \
          --exclude-from=$EXCLUDES_LIST \
          ${RSYNC_PATH:+"--rsync-path=$RSYNC_PATH"} \
          ${RSH:+"--rsh=$RSH"} \
          "$SRC" "$DST" \
-         ${FIND_FILES:+ --files-from=<(find "$SRC" | sed -E 's#'"$SRC"'/?##g')}  &&
-      echoinfo "Initial sync to container done."  ||
-      echowarn "Initial sync finished with errors/warnings."
+         ${FIND_FILES:+ --files-from=<(find "$SRC" | sed -E 's#'"$SRC"'/?##g')}
          #"$SRC" "$DST_HOST:$DST_PATH" \
          #--temp-dir=.rsync.temp \
+   then echoinfo "Initial sync to container done."
+   else echowarn "Initial sync finished with errors/warnings."
+   fi
 }
 
 function fswatch_cmd

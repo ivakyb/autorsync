@@ -126,6 +126,7 @@ contains_element(){
    return 1
 }
 
+## Usage for_each var_name in array_name do 
 for_each_in_var(){
    declare -rn _a=$1
    shift

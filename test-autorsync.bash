@@ -47,7 +47,7 @@ assert_file_contents_are_same(){
 
 
 declare -A TestcasesDescriptions TestcasesStatuses
-SUCCEDED=0
+SUCCEEDED=0
 FAILED=0
 SKIPPED=0
 
@@ -60,8 +60,13 @@ declare_test(){ local name="$1" description="${2:-}" declared=declared
 #   declare -gA Testcase_$name=( [name]=$name [description]="$description" [status]=$declared [stdout]= [stderr]= )
 }
 
-status(){ local name=$1 status="$2"
-   TestcasesStatuses+=( [$name]="$status" )
+status(){ local name=$1 status=$2 status_full="${@:2}"
+   case $status in
+      skipped)   ((SKIPPED++))   ||true ;;
+      succeeded) ((SUCCEEDED++)) ||true ;;
+      failed)    ((FAILED++))    ||true ;;
+   esac
+   TestcasesStatuses+=( [$name]="$status_full" )
 #   Testcase_$name+=( [status]="$status" )
 }
 
@@ -79,43 +84,39 @@ run_test(){ local testname=$1;
       $testname
    );then
       if [[ $(cat $SKIPFILE) = $testname ]]; then 
-         ((SKIPPED++)) ||true
          status $testname skipped
          echo "--- $testname "$'\e[1;37m'"SKIPPED"$'\e[0m'
       else
-         ((SUCCEDED++)) ||true
-         status $testname succeded
+         status $testname succeeded
          echo "--- $testname "$'\e[1;32m'"SUCCEEDED"$'\e[0m'
       fi
    else
-      ((FAILED++)) ||true
-      status $testname "failed $?"
+      status $testname failed $?
       #TestcasesStatuses+=( [$testname]=$? )
       echo "--- $testname "$'\e[1;31m'"FAILED"$'\e[0m'
    fi
    rm $SKIPFILE
 }
 
-for_each_testcase(){
-   for testname in ${Testcases[@]} ;do
-      eval "$@" $testname
-   done
-}
 show_testcases(){
    for testname in ${Testcases[@]} ;do
       echomsg --- $testname \""${TestcasesDescriptions[$testname]}"\"
    done
 }
 execute_testcases(){
-   for testname in ${Testcases[@]} ;do
-      run_test $testname
-   done
-}
-execute_testcases_from_arguments(){
-   for testname in ${testcases_to_run[@]} ;do
-      assert array Testcases contains_element $testname
-      run_test $testname
-   done
+   if [[ "${testcases_to_run[@]}" ]] ;then
+      for testname in ${Testcases[@]} ;do
+         if array testcases_to_run contains_element $testname ;then
+            run_test $testname
+         else
+            status $testname skipped
+         fi
+      done
+   else
+      for testname in ${Testcases[@]} ;do
+         run_test $testname
+      done
+   fi
 }
 
 start_autorsync(){
@@ -129,7 +130,7 @@ start_autorsync(){
 alias skip='echo "$testname">$SKIPFILE; return 0'
 
 report_results(){
-   echo -e "\e[31mFAILED \e[1;31m$FAILED\e[0m, \e[32mSUCCEDED \e[1;32m$SUCCEDED\e[0m, \e[37mSKIPPED \e[1;37m$SKIPPED\e[0m"
+   echo -e "\e[31mFAILED \e[1;31m$FAILED\e[0m, \e[32mSUCCEEDED \e[1;32m$SUCCEEDED\e[0m, \e[37mSKIPPED \e[1;37m$SKIPPED\e[0m"
    #echo "Failed: ${TestcasesFailed}"
    #echo "Skipped: ${TestcasesSkiped}"
 }
@@ -247,17 +248,26 @@ debug tree tx_local rx_remote
 ## Synchronize to existing directory. Live sync
 ## If SRC ends with / sync files in it, else sync SRC itself.
 #############################################
-
+declare_test live_sync_with_slash "Live synchronize files to existing directory."
+function live_sync_with_slash {
+   mkdir -p tx_local rx_remote
+   
+   start_autorsync --no-initial-tx tx_local localhost:$PWD/rx_remote
+   sleep 1.1
+   
+   echo "Hello World" >tx_local/hello_world
+   sleep 1.1
+debug tree tx_local rx_remote
+   assert diff -q tx_local/hello_world rx_remote/tx_local/hello_world
+   
+   pkill -P $autorsync_pid  ## https://stackoverflow.com/questions/2618403/how-to-kill-all-subprocesses-of-shell#17615178
+}
 
 
 #############################################
 ## Execute Testcases
 #############################################
-if [[ "${testcases_to_run[@]}" ]];then
-   execute_testcases_from_arguments
-else
-   execute_testcases
-fi
+execute_testcases
 #run_test initial_sync
 #run_test live_changes
 #run_test sync-to-existing
