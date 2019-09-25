@@ -3,8 +3,19 @@ set -euo pipefail
 DEBUG=1
 source "$(realpath $(dirname "${BASH_SOURCE[0]}"))/utils.bash"
 
-AUTORSYNC="${1:-$SRCDIR/autorsync.bash}"
-shift || true
+while (( $# > 0 ))
+do
+   case "$1" in
+      --autorsync=*)
+         AUTORSYNC="${1#*=}"
+         ;;
+      *)
+         testcases_to_run+=("$1")
+         ;;
+   esac
+   shift
+done
+AUTORSYNC=${AUTORSYNC:=$SRCDIR/autorsync.bash}
 
 assert(){
    eval "$@" || { 
@@ -56,6 +67,7 @@ status(){ local name=$1 status="$2"
 
 run_test(){ local testname=$1; 
 #assert_warn (( $#==1 ))
+   #assert function is declared
    echomsg --- $testname \""${TestcasesDescriptions[$testname]}"\"
    status $testname started
    SKIPFILE=$(mktemp)
@@ -96,6 +108,12 @@ show_testcases(){
 }
 execute_testcases(){
    for testname in ${Testcases[@]} ;do
+      run_test $testname
+   done
+}
+execute_testcases_from_arguments(){
+   for testname in ${testcases_to_run[@]} ;do
+      assert array Testcases contains_element $testname
       run_test $testname
    done
 }
@@ -235,7 +253,11 @@ debug tree tx_local rx_remote
 #############################################
 ## Execute Testcases
 #############################################
-execute_testcases
+if [[ "${testcases_to_run[@]}" ]];then
+   execute_testcases_from_arguments
+else
+   execute_testcases
+fi
 #run_test initial_sync
 #run_test live_changes
 #run_test sync-to-existing

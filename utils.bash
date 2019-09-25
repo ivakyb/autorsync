@@ -126,11 +126,13 @@ contains_element(){
    return 1
 }
 
-# for_each(){
-#    for elem in ${!1[@]} ;do
-#       eval "$@" $testname
-#    done
-# }
+for_each_in_var(){
+   declare -rn _a=$1
+   shift
+   for elem in ${!_a[@]} ;do
+      eval "$@" $elem
+   done
+}
 
 kill_sure(){
    kill -TERM "$@" &>/dev/null ||  return 0   ## Already dead
