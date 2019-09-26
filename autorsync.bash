@@ -44,7 +44,7 @@ readonly mydir="$( dirname $(readlink -f ${BASH_SOURCE[0]} ) )"
 
 source $mydir/utils.bash
 
-trap_append 'set -x; jobs; ps=$(jobs -p); ${ps:+ kill $ps} || true; jobs' INT HUP EXIT
+trap_append 'jobs; ps=$(jobs -p); ${ps:+ kill $ps} || true; jobs' INT HUP EXIT
 #trap "kill -hup 0" hup
 
 unset SRC
@@ -94,6 +94,10 @@ do
          ;;
       --initial-tx|--enable-initial-tx|--use-initial-tx)
          USE_INITIAL_TX=y
+         ;;
+      --initial-tx-only)
+         USE_INITIAL_TX=y
+         unset USE_TX USE_RX
          ;;
       --initial-tx-delete-missing)
          echowarn "Option --initial-tx-delete-missing is under construction!"
@@ -296,6 +300,7 @@ function rsync_tx
 
    NORMALIZE_PATH="$(realpath "$SRC")"
    echodbg NORMALIZE_PATH $NORMALIZE_PATH
+   
    fswatch_cmd "$SRC" | 
       NORMALIZE_PATH="$(realpath "$SRC")" \
       rsync_cmd "$SRC" "$DST"
@@ -334,12 +339,13 @@ REMOTE_UNAME="$($SSH $DST_HOST uname)"
 var_is_unset_or_empty REMOTE_PATH && test $REMOTE_UNAME = Darwin && REMOTE_PATH=/usr/local/bin
 var_is_unset_or_empty RSYNC_PATH  && test $REMOTE_UNAME = Darwin && RSYNC_PATH="${REMOTE_PATH:+$REMOTE_PATH/}rsync"
 
+if var_is_set USE_INITIAL_TX ;then
+   echoinfo "Begin initial_tx"
+   initial_tx
+   echoinfo "Done initial_tx"
+fi
+   
 if var_is_set_not_empty USE_TX ;then
-   if var_is_set USE_INITIAL_TX ;then
-      echoinfo "Begin initial_tx"
-      initial_tx
-      echoinfo "Done initial_tx"
-   fi
    echoinfo "Starting rsync_tx"
    rsync_tx  & pid_tx=$!
    sleep 0.2 && kill -0 $pid_tx 2>&- ||  fatalerr "rsync_tx $pid_tx failed to start"  ## Check process is running successfully
