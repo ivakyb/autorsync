@@ -270,9 +270,8 @@ function rsync_cmd
       trap_append "echodbg 'Clean up rsync_cmd. Removing ff $ff'; rm $ff" EXIT
    while read -d $'\x04' ;do
       echodbg "$(test "$1" == "$SRC" && echo "L==>R" || echo "L<==R") $REPLY"
-      echo "$REPLY" >$ff #| cut -d' ' -f1 >$ff
+      echo "$REPLY" >$ff
       normalize_path "$NORMALIZE_PATH" -i $ff
-      echodbg ============ "RSYNC_PATH=$RSYNC_PATH"
       rsync --archive --relative --delete --delete-missing-args  \
             --info=progress2 --files-from=$ff  \
             --temp-dir=.rsync.temp --exclude='.rsync.temp/*' \
@@ -285,9 +284,10 @@ function rsync_cmd
 
 function rsync_tx
 {
-   test -d $SRC &&
-      local dir="$SRC/.rsync.temp"  ||
-      local dir="${SRC%/*}/.rsync.temp"
+   if test -d $SRC
+   then local dir="$SRC/.rsync.temp"
+   else local dir="${SRC%/*}/.rsync.temp"
+   fi
    mkdir -p "$dir"
    trap_append "echodbg 'Cleanup rsync_tx. Removing \"$dir\"'; rm -rf \"$dir\"" EXIT
 
