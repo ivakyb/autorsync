@@ -12,12 +12,16 @@ declare_test initial_sync "Initial sync"
 function initial_sync {
    mkdir tx_local rx_remote
    echo "Hello World" >tx_local/hello_world
-   autorsync tx_local/ localhost:$PWD/rx_remote & ars_pid=$!
-   assert kill -0 $ars_pid  ## are you alive?
-   sleep 1
-   kill $ars_pid 2>&- #|| true
+   
+   autorsync --initial-tx-only tx_local localhost:$PWD/rx_remote  ## SRC ends without slash '/'
+   assert_file_contents_are_same tx_local/hello_world rx_remote/tx_local/hello_world
+   
+   rm -rf rx_remote/*
+   
+   autorsync --initial-tx-only tx_local/ localhost:$PWD/rx_remote
    assert_file_contents_are_same tx_local/hello_world rx_remote/hello_world
 }
+readonly -f initial_sync
 
 #############################################
 ## Test 2

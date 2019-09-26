@@ -145,5 +145,5 @@ kill_sure(){
 }
 
 #function OnError {  caller | { read line file; echoerr "in $file:$line" >&2; };  }
-OnError(){ stacktrace; }
+OnError(){ echoerr "in $BASH_SOURCE:$BASH_LINENO"; stacktrace; }
 trap OnError ERR

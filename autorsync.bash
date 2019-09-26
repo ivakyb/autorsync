@@ -230,15 +230,14 @@ function initial_tx
    fi
    #mkdir -p .rsync.temp  #mktemp -d 
    $SSH $DST_HOST mkdir -p "$DST_PATH"/.rsync.temp #bash -xc "test -d '$DST_PATH' && mkdir -p '$DST_PATH'/.rsync.temp || mkdir -p '$DST_PATH'.rsync.temp"
-   if rsync --archive --relative --info=progress2  \
+   if rsync --archive --info=progress2  \
          --temp-dir=.rsync.temp  \
          --exclude-from=$EXCLUDES_LIST \
          ${RSYNC_PATH:+"--rsync-path=$RSYNC_PATH"} \
          ${RSH:+"--rsh=$RSH"} \
          "$SRC" "$DST" \
-         ${FIND_FILES:+ --files-from=<(find "$SRC" | sed -E 's#'"$SRC"'/?##g')}
-         #"$SRC" "$DST_HOST:$DST_PATH" \
-         #--temp-dir=.rsync.temp \
+         #${FIND_FILES:+ --files-from=<(find "$SRC" | sed -E 's#'"$SRC"'/?##g')}
+         #--relative 
    then echoinfo "Initial sync to container done."
    else echowarn "Initial sync finished with errors/warnings."
    fi
