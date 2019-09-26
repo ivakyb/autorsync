@@ -2,11 +2,24 @@
 set -euo pipefail
 source "$(realpath $(dirname "${BASH_SOURCE[0]}"))/utils.bash"
 
+## First letter in uppercase means this is a main function for user code
+## Should be used after all tests were declared
+Testing(){
+   execute_testcases
+   report_results
+   exit $EXIT_CODE
+}
+
 while (( $# > 0 ))
 do
    case "$1" in
-      --autorsync=*)
-         AUTORSYNC="${1#*=}"
+      list|show|show_testcases)
+         Testing(){
+            show_testcases
+            exit
+         } ;;
+      all)
+         ALL=y
          ;;
       *)
          testcases_to_run+=("$1")
@@ -14,42 +27,40 @@ do
    esac
    shift
 done
-AUTORSYNC=${AUTORSYNC:=$SRCDIR/autorsync.bash}
+var_is_set ALL && unset testcases_to_run
 
 assert(){
    eval "$@" || { 
       excod=$?
-      echoerr "Assert FAILED in ${BASH_SOURCE[0]:-}:${BASH_LINENO[0]} ${FUNCNAME[1]:-nofunc}()  $@"
+      #echoerr "Assert FAILED in ${BASH_SOURCE[0]:-}:${BASH_LINENO[0]} ${FUNCNAME[1]:-nofunc}()  $@"
+      echoerr "Assert FAILED in ${BASH_SOURCE[1]:-}:${BASH_LINENO[0]} ${FUNCNAME[1]:-nofunc}()  $@"
       stacktrace2 #2 2
       exit 1
    }
 }
+
 assert_warn(){
    eval "$@" || { 
       excod=$?
       echowarn "Assert FAILED: $@"
-      [[ $- != *e* ]] && return 0 || return $excod
+      [[ $- != *e* ]] && return 0 || return $excod  ## If errexit
    }
 }
 
-autorsync(){
-   "$AUTORSYNC" "$@"
-}
-
-alias diffq='diff -q '
-
 assert_file_contents_are_same(){
-   assert diff -q "$1" "$2"
+   diff -q "$1" "$2" || { 
+      excod=$?
+      echoerr "Assert FAILED in ${BASH_SOURCE[1]:-}:${BASH_LINENO[0]} ${FUNCNAME[1]:-nofunc}()  $@"
+      stacktrace
+      exit 1
+   }
 }
 
 #trap_append 'set -x' EXIT
 
 
 declare -A TestcasesDescriptions TestcasesStatuses
-SUCCEEDED=0
-FAILED=0
-SKIPPED=0
-DECLARED=0
+declare -i SUCCEEDED=0 FAILED=0 SKIPPED=0 DECLARED=0
 
 declare_test(){ local name="$1" description="${2:-}" declared=declared
    ## Assert arrays of Testcases does not already contain $name
@@ -58,17 +69,21 @@ declare_test(){ local name="$1" description="${2:-}" declared=declared
    TestcasesDescriptions+=( [$name]="$description" )
    status $name declared  #TestcasesStatuses+=(     [$name]=$declared )
 #   declare -gA Testcase_$name=( [name]=$name [description]="$description" [status]=$declared [stdout]= [stderr]= )
+   if declare -F $name >/dev/null ;then
+      readonly -f $name
+   fi
 }
 
 status(){ local name=$1 status=$2 status_full="${@:2}"
    case $status in
-      declared)  ((DECLARED++))  ||true ;;
-      skipped)   ((SKIPPED++))   ||true ;;
-      succeeded) ((SUCCEEDED++)) ||true ;;
-      failed)    ((FAILED++))    ||true ;;
+      declared)  DECLARED+=1  ;; #((DECLARED++))  ||true ;;
+      skipped)   SKIPPED+=1   ;; #((SKIPPED++))   ||true ;;
+      succeeded) SUCCEEDED+=1 ;; #((SUCCEEDED++)) ||true ;;
+      failed)    FAILED+=1    ;; #((FAILED++))    ||true ;;
+      #*) fatalerr "Unexpected value status=$status"
    esac
    TestcasesStatuses+=( [$name]="$status_full" )
-#   Testcase_$name+=( [status]="$status" )
+#   Testcase_$name+=( [status]="$status_full" )
 }
 status_get(){ local name=$1
    echo ${TestcasesStatuses[$1]}
@@ -81,6 +96,10 @@ run_test(){ local testname=$1;
    status $testname started
    SKIPFILE=$(mktemp)
    if (
+      #FIXME
+      set -euo pipefail
+      trap OnError ERR
+      false  ## Why this does 
       #status $testname running
       workdir=$(mktemp -d)
       trap_append "rm -r $workdir" EXIT
@@ -139,15 +158,8 @@ execute_testcases(){
    ## ToDo fatalerr "no such testcase"
 }
 
-start_autorsync(){
-   assert var_is_unset_or_empty autorsync_pid
-   autorsync "$@"  & autorsync_pid=$!
-   sleep 0.2 && assert kill -0 $autorsync_pid 2>&-
-   trap_append "kill_sure $autorsync_pid; unset autorsync_pid" exit
-   #echoinfo "AutoRSync started with PID $autorsync_pid"
-}
-
 alias skip='echo "$testname">$SKIPFILE; return 0'
+alias SKIP=skip
 
 report_results(){
    echo -e "\e[31mFAILED \e[1;31m$FAILED\e[0m, \e[32mSUCCEEDED \e[1;32m$SUCCEEDED\e[0m, \e[33mSKIPPED \e[1;33m$SKIPPED\e[0m"

@@ -1,7 +1,41 @@
 #!/usr/bin/env bash
 set -euo pipefail
 DEBUG=1
-source "$(realpath $(dirname "${BASH_SOURCE[0]}"))/testing.bash"
+
+ARGS=()
+while (( $# > 0 ))
+do
+   case "$1" in
+      --autorsync=*|autorsync=*)  ##ToDo move this to test-autorsync.bash
+         AUTORSYNC="${1#*=}"
+         ;;
+      *)
+         ARGS+=("$1")
+   esac
+   shift
+done
+
+source "$(realpath $(dirname "${BASH_SOURCE[0]}"))/testing.bash" "${ARGS[@]}"
+
+AUTORSYNC=${AUTORSYNC:=$SRCDIR/autorsync.bash}
+
+
+## PREREQUISITES
+## 1. ssh must be configured to be able `ssh localhost` without typing passwords
+## 2. 
+
+
+start_autorsync(){
+   assert var_is_unset_or_empty autorsync_pid
+   autorsync "$@"  & autorsync_pid=$!
+   sleep 0.2 && assert kill -0 $autorsync_pid 2>&-
+   trap_append "pstree $autorsync_pid; kill_sure $autorsync_pid; unset autorsync_pid" exit
+   #echoinfo "AutoRSync started with PID $autorsync_pid"
+}
+
+autorsync(){
+   "$AUTORSYNC" "$@"
+}
 
 
 #############################################
@@ -57,7 +91,7 @@ function live_changes {
    
    assert diff -q test1a/hello_world test1b/hello_world
 }
-
+readonly -f live_changes
 
 #############################################
 ## Test 3
@@ -90,6 +124,7 @@ function sync_to_existing {
 debug jobs -l
 #   wait
 }
+readonly sync_to_existing
 
 #############################################
 ## Test 4
@@ -114,6 +149,7 @@ debug tree tx_local rx_remote
 #echodbg ----- pgrep; debug pgrep -P $$
 #echodbg ----- pstree; debug pstree $$
 }
+readonly -f initial_sync_with_slash
 
 #############################################
 ## Test 5. TODO
@@ -157,16 +193,24 @@ debug tree tx_local rx_remote
 }
 readonly -f rsync_with_slash
 
+#############################################
+## Test 7
+## Stop process
+#############################################
+declare_test stop_process "Stop process"
+function stop_process {
+   SKIP  ## Look at last line of function
+   mkdir tx_local rx_remote
+   echo "Hello World" >tx_local/hello_world
+   autorsync tx_local/ localhost:$PWD/rx_remote & ars_pid=$!
+   sleep 0.2 && assert kill -0 $ars_pid  ## are you alive?
+   sleep 1
+   kill $ars_pid 2>&-  ## Kills only parent process but not its childs. FIXME
+}
+readonly -f stop_process
 
 
 #############################################
 ## Execute Testcases
 #############################################
-execute_testcases
-#run_test initial_sync
-#run_test live_changes
-#run_test sync_to_existing
-#run_test initial_sync_with_slash
-
-report_results
-exit $EXIT_CODE
+Testing

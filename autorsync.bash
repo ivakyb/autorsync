@@ -269,19 +269,25 @@ function normalize_path
 function rsync_cmd
 {
    ## ToDo OPTIMIZATION if DST is ssh-url, start rsyncd on destination host and user rsync:// for often rsync requests. Will be faster because does not need open ssh connection every time.
+   if test "${1: -1}" = /  &&  test -d "$1" ;then
+      local FIND_FILES=y
+   fi
    ff=$(mktemp) && 
       trap_append "echodbg 'Clean up rsync_cmd. Removing ff $ff'; rm $ff" EXIT
    while read -d $'\x04' ;do
       echodbg "$(test "$1" == "$SRC" && echo "L==>R" || echo "L<==R") $REPLY"
       echo "$REPLY" >$ff
       normalize_path "$NORMALIZE_PATH" -i $ff
-      rsync --archive --relative --delete --delete-missing-args  \
+      if rsync --archive --relative --delete --delete-missing-args  \
             --info=progress2 --files-from=$ff  \
             --temp-dir=.rsync.temp --exclude='.rsync.temp/*' \
+            "$@" \
             ${RSYNC_PATH:+"--rsync-path=$RSYNC_PATH"} \
             ${RSH:+"--rsh=$RSH"} \
-            "$@"  \
-         || echowarn "Failed to sync: $(cat $ff)"
+            #${FIND_FILES:+ --files-from=<(find "$1" | sed -E 's#'"$1"'/?##g')}
+      then :
+      else echowarn "Failed to sync: $(cat $ff)"
+      fi
    done
 }
 
