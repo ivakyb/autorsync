@@ -89,23 +89,21 @@ status_get(){ local name=$1
    echo ${TestcasesStatuses[$1]}
 }
 
-run_test(){ local testname=$1; 
-#assert_warn (( $#==1 ))
+run_test(){ local testname=$1;
+   #assert_warn (( $#==1 ))
    #assert function is declared
    echomsg --- $testname \""${TestcasesDescriptions[$testname]}"\"
    status $testname started
    SKIPFILE=$(mktemp)
-   if (
-      #FIXME
+   set +e; (
       set -euo pipefail
-      trap OnError ERR
-      false  ## Why this does 
       #status $testname running
       workdir=$(mktemp -d)
-      trap_append "rm -r $workdir" EXIT
+      trap "cd; rm -r $workdir" EXIT
       cd $workdir
       $testname
-   );then
+   ); local status=$?; set -e
+   if ((status==0)) ;then
       if [[ $(cat $SKIPFILE) = $testname ]]; then 
          status $testname skipped
          echo "--- $testname "$'\e[1;33m'"SKIPPED"$'\e[0m'
