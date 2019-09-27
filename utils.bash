@@ -77,7 +77,7 @@ fi
 function echoerr  { >/dev/stderr echo $'\e[0;31m'"ERR  $@"$'\e[0m'; }
 function fatalerr { 
    echoerr "$@"
-   stacktrace2 2
+   stacktrace    #2 2
    exit 1
 }
 alias die=fatalerr
@@ -90,7 +90,7 @@ function stacktrace {
    done
 }
 function stacktrace2 {
-   local i=${1:-1} size=${#BASH_SOURCE[@]}
+   local i=${1:=1} size=${#BASH_SOURCE[@]}
    ((i<size)) && echodbg "STACKTRACE"
    for ((; i < size-1; i++)) ;do  ## -1 to exclude main()
       ((frame=${#BASH_SOURCE[@]}-i-2 ))

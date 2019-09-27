@@ -34,7 +34,13 @@ start_autorsync(){
 }
 
 autorsync(){
-   "$AUTORSYNC" "$@"
+   "$AUTORSYNC" "$@"  ||
+   {
+      ## If autorsync was terminated with SIGTERM do not report an error
+      declare -i status=$? SIGTERM=15
+      (($status==SIGTERM)) && status=0
+      return $status
+   }
 }
 
 
