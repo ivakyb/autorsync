@@ -4,8 +4,8 @@ shopt -u failglob
 shopt -s lastpipe #inherit_errexit
 DEBUG={DEBUG:-1}
 
-VERSION=master-c25-gff3f117-b134
-NPM_VERSION=1.25.134
+VERSION=master-c26-ge7e296e-b148
+NPM_VERSION=1.26.148
 
 ## KNOWN ISSUES
 ## * fswatch on MacOS does not detect deleted folder (CHECK)
