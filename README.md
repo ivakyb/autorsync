@@ -18,6 +18,10 @@ Comparing to docker-volumes autorsync scheme consumes two times more space, but 
 *  `ssh`, 
 *  `perl` *(todo rm dependancy)*.
 
+```sh
+brew install bash coreutils rsync fswatch ssh perl findutils gnu-sed
+```
+
 ## Usage
 The syntax similar to rsync
 ```
