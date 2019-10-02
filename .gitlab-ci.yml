@@ -18,7 +18,7 @@ test_before_build:
   stage: build
   image: ubuntu
   variables:
-    AUTORSYNC: "./autorsync.bash"
+    AUTORSYNC: "$CI_PROJECT_DIR/autorsync.bash"
   script: &test_script
   #- git checkout -B $CI_COMMIT_REF_NAME
   - apt-get update -qyy && apt install -qyy --no-install-recommends openssh-server openssh-client ca-certificates perl rsync fswatch psmisc tree
