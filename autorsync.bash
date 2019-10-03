@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+## Copyright (c) 2019 Ivan Kuvaldin aka "kyb"
+## Under MIT License
+## https://gitlab.com/kyb/autorsync
+
 set -euo pipefail
 shopt -u failglob
 shopt -s lastpipe huponexit #inherit_errexit
