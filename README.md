@@ -20,13 +20,14 @@ Comparing to docker-volumes autorsync scheme consumes two times more space, but 
 *  `pgrep` and `pkill` from package psmisc
 
 ```sh
-brew install bash coreutils rsync fswatch ssh perl findutils gnu-sed
+brew install bash coreutils rsync fswatch perl findutils gnu-sed
 ```
+*To run [./test-autorsync.bash](./test-autorsync.bash) also need `brew install tree pstree`*
 
 ## Usage
 The syntax similar to rsync
 ```
-autorsync /local/path remote_host:/target/path/
+autorsync /local/path/ remote_host:/target/path/
 ```
 *ToDo write here more detailed examples and explanation*
 
