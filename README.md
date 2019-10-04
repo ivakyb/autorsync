@@ -1,7 +1,7 @@
 [![](https://gitlab.com/kyb/autorsync/badges/master/pipeline.svg)](https://gitlab.com/kyb/autorsync/pipelines?scope=branches)
 
 # AutoRSync
-Two-side file syncronization utility in bash using rsync and fswatch.
+Two-side file syncronization utility written in bash using [rsync](https://rsync.samba.org/) and [fswatch](https://github.com/emcrisostomo/fswatch).
 Able to monitor changes and synchronize files between two hosts.
 
 ### Why
@@ -13,8 +13,8 @@ Comparing to docker-volumes autorsync scheme consumes two times more space, but 
 
 ## Prerequisties
 *  `bash` version 4 or later, 
-*  `rsync` version 3 or later,
-*  `fswatch`, 
+*  [`rsync`](https://rsync.samba.org/) version 3 or later,
+*  [`fswatch`](https://github.com/emcrisostomo/fswatch), 
 *  `ssh`, 
 *  `perl` *(todo rm dependancy)*.
 *  `pgrep` and `pkill` from package psmisc
