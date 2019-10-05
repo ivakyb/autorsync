@@ -17,6 +17,7 @@ Comparing to docker-volumes autorsync scheme consumes two times more space, but 
 *  `fswatch`, 
 *  `ssh`, 
 *  `perl` *(todo rm dependancy)*.
+*  `pgrep` and `pkill` from package psmisc
 
 ```sh
 brew install bash coreutils rsync fswatch ssh perl findutils gnu-sed
@@ -28,6 +29,8 @@ The syntax similar to rsync
 autorsync /local/path remote_host:/target/path/
 ```
 *ToDo write here more detailed examples and explanation*
+
+Trailing slash in SRC is important. See https://stackoverflow.com/questions/20300971/rsync-copy-directory-contents-but-not-directory-itself
 
 ## Installation
 

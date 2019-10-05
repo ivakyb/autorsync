@@ -77,7 +77,7 @@ fi
 function echoerr  { >/dev/stderr echo $'\e[0;31m'"ERR  $@"$'\e[0m'; }
 function fatalerr { 
    echoerr "$@"
-   stacktrace2 2
+   stacktrace    #2 2
    exit 1
 }
 alias die=fatalerr
@@ -126,11 +126,14 @@ contains_element(){
    return 1
 }
 
-# for_each(){
-#    for elem in ${!1[@]} ;do
-#       eval "$@" $testname
-#    done
-# }
+## Usage for_each var_name in array_name do 
+for_each_in_var(){
+   declare -rn _a=$1
+   shift
+   for elem in ${!_a[@]} ;do
+      eval "$@" $elem
+   done
+}
 
 kill_sure(){
    kill -TERM "$@" &>/dev/null ||  return 0   ## Already dead
@@ -141,6 +144,7 @@ kill_sure(){
    fi
 }
 
-#function OnError {  caller | { read line file; echoerr "in $file:$line" >&2; };  }
-OnError(){ stacktrace; }
+function OnError {  caller | { read line file; echoerr "in $file:$line"; };  }
+#OnError(){ echoerr "in $BASH_SOURCE:$BASH_LINENO"; stacktrace; }
+#OnError(){ echoerr "in ${BASH_SOURCE[1]}:${BASH_LINENO[0]}"; stacktrace; }
 trap OnError ERR

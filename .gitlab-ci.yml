@@ -18,10 +18,10 @@ test_before_build:
   stage: build
   image: ubuntu
   variables:
-    AUTORSYNC: "./autorsync.bash"
+    AUTORSYNC: "$CI_PROJECT_DIR/autorsync.bash"
   script: &test_script
   #- git checkout -B $CI_COMMIT_REF_NAME
-  - apt-get update -qyy && apt install -qyy --no-install-recommends openssh-server openssh-client ca-certificates perl rsync fswatch psmisc
+  - apt-get update -qyy && apt install -qyy --no-install-recommends openssh-server openssh-client ca-certificates perl rsync fswatch psmisc tree
   #- apk add --no-cache bash rsync fswatch openssh perl ca-certificates
   #- /usr/bin/ssh-keygen -A  ## For Alpine only, not for Ubuntu
   - ssh-keygen -o -t rsa -b 4096 -f ~/.ssh/id_rsa -P ""
@@ -40,7 +40,7 @@ test:
   - build
   image: ubuntu
   variables:
-    AUTORSYNC: ./autorsync
+    AUTORSYNC: "$CI_PROJECT_DIR/autorsync"
   script: *test_script
   
 
