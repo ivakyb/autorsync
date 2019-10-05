@@ -40,7 +40,7 @@ test:
   - build
   image: ubuntu
   variables:
-    AUTORSYNC: ./autorsync
+    AUTORSYNC: "$CI_PROJECT_DIR/autorsync"
   script: *test_script
   
 
