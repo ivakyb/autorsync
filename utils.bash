@@ -90,7 +90,7 @@ function stacktrace {
    done
 }
 function stacktrace2 {
-   local i=${1:=1} size=${#BASH_SOURCE[@]}
+   local i=${1:-1} size=${#BASH_SOURCE[@]}
    ((i<size)) && echodbg "STACKTRACE"
    for ((; i < size-1; i++)) ;do  ## -1 to exclude main()
       ((frame=${#BASH_SOURCE[@]}-i-2 ))
@@ -144,7 +144,7 @@ kill_sure(){
    fi
 }
 
-#function OnError {  caller | { read line file; echoerr "in $file:$line" >&2; };  }
-OnError(){ echoerr "in $BASH_SOURCE:$BASH_LINENO"; stacktrace; }
+function OnError {  caller | { read line file; echoerr "in $file:$line"; };  }
+#OnError(){ echoerr "in $BASH_SOURCE:$BASH_LINENO"; stacktrace; }
 #OnError(){ echoerr "in ${BASH_SOURCE[1]}:${BASH_LINENO[0]}"; stacktrace; }
 trap OnError ERR

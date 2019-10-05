@@ -22,6 +22,9 @@ NPM_VERSION=0.0.0
 ## * --install and --install-symlink as they are in git-rev-label
 ## * Useful hack -- protect myself from writing while executing
 ## * Implement options under construction!
+## * For two side sync it is required to distinguish updates made by autorsync and updates made by others. To suppress cyclic updates.
+## * OPTIMIZATION if DST is ssh-url, start rsyncd on destination host and user rsync:// for often rsync requests. Will be faster because does not need to open ssh connection every time.
+## * OPTIMIZATION Consider locate .rsync-temp in RAM, at least low low size files.
 
 function darwin_aliases {
    if test `uname` == Darwin ;then
@@ -44,7 +47,10 @@ readonly mydir="$( dirname $(readlink -f ${BASH_SOURCE[0]} ) )"
 
 source $mydir/utils.bash
 
-trap_append 'jobs; ps=$(jobs -p); ${ps:+ kill $ps} || true; jobs' INT HUP EXIT
+trap_append 'echoinfo autorsync: TERMINATED' TERM
+trap_append 'echoinfo autorsync: INTERRUPTED' INT
+trap_append 'echoinfo autorsync: CAUGHT SIGHUP' HUP
+trap_append 'ps=$(jobs -p); ${ps:+ kill $ps} || true;' EXIT
 #trap "kill -hup 0" hup
 
 unset SRC
@@ -175,7 +181,7 @@ do
 done
 ## Assert
 var_is_set_not_empty SRC || fatalerr "Source is not set" 
-var_is_set_not_empty DST || fatalerr "Destionation is not set" 
+var_is_set_not_empty DST || fatalerr "Destination is not set" 
 ## If SRC ends with slash '/' sync folder contents without the folder itself
 ## ToDo: consider combinations DST/SRC/file/directory
 
@@ -268,22 +274,20 @@ function normalize_path
 
 function rsync_cmd
 {
-   ## ToDo OPTIMIZATION if DST is ssh-url, start rsyncd on destination host and user rsync:// for often rsync requests. Will be faster because does not need open ssh connection every time.
-   if test "${1: -1}" = /  &&  test -d "$1" ;then
-      local FIND_FILES=y
-   fi
+   ## ToDo OPTIMIZATION if DST is ssh-url, start rsyncd on destination host and user rsync:// for often rsync requests. Will be faster because does not need to open ssh connection every time.
    ff=$(mktemp) && 
       trap_append "echodbg 'Clean up rsync_cmd. Removing ff $ff'; rm $ff" EXIT
    while read -d $'\x04' ;do
-      echodbg "$(test "$1" == "$SRC" && echo "L==>R" || echo "L<==R") $REPLY"
+      echodbg "$(test "$src" == "$SRC" && echo "-->" || echo "<--") " #$REPLY"
       echo "$REPLY" >$ff
       normalize_path "$NORMALIZE_PATH" -i $ff
       if rsync --archive --relative --delete --delete-missing-args  \
             --info=progress2 --files-from=$ff  \
             --temp-dir=.rsync.temp --exclude='.rsync.temp/*' \
-            "$@" \
+            "$src" "$dst" \
             ${RSYNC_PATH:+"--rsync-path=$RSYNC_PATH"} \
             ${RSH:+"--rsh=$RSH"} \
+            "$@" \
             #${FIND_FILES:+ --files-from=<(find "$1" | sed -E 's#'"$1"'/?##g')}
       then :
       else echowarn "Failed to sync: $(cat $ff)"
@@ -293,26 +297,27 @@ function rsync_cmd
 
 function rsync_tx
 {
-   if test -d $SRC
-   then local dir="$SRC/.rsync.temp"
-   else local dir="${SRC%/*}/.rsync.temp"
-   fi
-   mkdir -p "$dir"
-   trap_append "echodbg 'Cleanup rsync_tx. Removing \"$dir\"'; rm -rf \"$dir\"" EXIT
-
    $SSH $DST_HOST mkdir -p "$DST_PATH"/.rsync.temp
    trap_append "echodbg 'Cleanup rsync_tx. Removing ssh://\"$DST_PATH/.rsync.temp\"'; $SSH $DST_HOST rm -rf \"$DST_PATH/.rsync.temp\"" EXIT
-
+ 
    NORMALIZE_PATH="$(realpath "$SRC")"
    echodbg NORMALIZE_PATH $NORMALIZE_PATH
    
    fswatch_cmd "$SRC" | 
       NORMALIZE_PATH="$(realpath "$SRC")" \
-      rsync_cmd "$SRC" "$DST"
+      src="$SRC" dst="$DST" rsync_cmd
 }
 
 function rsync_rx
 {
+   ## ToDo Create rsync.temp on local side
+   # if test -d $SRC
+   # then local tempdir="$SRC/.rsync.temp"
+   # else local tempdir="${SRC%/*}/.rsync.temp"
+   # fi
+   # mkdir -p "$tempdir"
+   # trap_append "echodbg 'Cleanup rsync_tx. Removing \"$tempdir\"'; rm -rf \"$tempdir\"" EXIT
+
    remote_command() {
       set -euo pipefail
       trap OnError ERR
@@ -321,7 +326,7 @@ function rsync_rx
       ulimit -n 10000
       fswatch_cmd "$DST_PATH"
    }
-   $SSH $DST_HOST ${REMOTE_PATH:+$REMOTE_PATH/}bash -<<END  | NORMALIZE_PATH="$($SSH "$DST_HOST" ${REMOTE_PATH:+$REMOTE_PATH/}realpath "$DST_PATH")" rsync_cmd "$DST" "$SRC"
+   $SSH $DST_HOST ${REMOTE_PATH:+$REMOTE_PATH/}bash -<<END  | NORMALIZE_PATH="$($SSH "$DST_HOST" ${REMOTE_PATH:+$REMOTE_PATH/}realpath "$DST_PATH")" src="$DST" dst="$SRC" rsync_cmd
       set -euo pipefail
       if test `uname` == Darwin ;then export PATH="/usr/local/bin:$PATH" ;fi
       $(cat $mydir/utils.bash)
@@ -334,22 +339,27 @@ END
    unset -f remote_command
 }
 
-## Sync on change
-test $(uname -s) == Darwin && period=0.5 || period=1
-#echoinfo "Startning sync_on_change with period=$period"
 
-DST_HOST=$(cut -d: -f1 <<<$DST)
-DST_PATH=$(cut -d: -f2 <<<$DST)
+DST_HOST="${DST%:*}"  #$(cut -d: -f1 <<<$DST)
+DST_PATH="${DST#*:}"  #$(cut -d: -f2 <<<$DST)
 REMOTE_UNAME="$($SSH $DST_HOST uname)"
 var_is_unset_or_empty REMOTE_PATH && test $REMOTE_UNAME = Darwin && REMOTE_PATH=/usr/local/bin
 var_is_unset_or_empty RSYNC_PATH  && test $REMOTE_UNAME = Darwin && RSYNC_PATH="${REMOTE_PATH:+$REMOTE_PATH/}rsync"
+if var_is_set_not_empty USE_TX && var_is_set_not_empty USE_RX
+then fatalerr "Two side sync is not stable!" ;fi
+#test $(uname -s) == Darwin && period=0.5 || period=1
 
 if var_is_set USE_INITIAL_TX ;then
    echoinfo "Begin initial_tx"
    initial_tx
    echoinfo "Done initial_tx"
 fi
-   
+
+if ! test "${SRC: -1}" = /  || ! test -d "$SRC"
+then  DST+="/`basename "$SRC"`/"
+      DST_PATH="${DST#*:}"
+fi
+
 if var_is_set_not_empty USE_TX ;then
    echoinfo "Starting rsync_tx"
    rsync_tx  & pid_tx=$!

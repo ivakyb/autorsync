@@ -77,7 +77,7 @@ function live_changes {
    }
 
    echo "Hello World" >test1a/hello_world
-   start_autorsync --use-rx test1a/ localhost:$PWD/test1b
+   start_autorsync test1a/ localhost:$PWD/test1b
    sleep 1.2  ## wait for inital sync
 
    ## Test live changes a->b
@@ -87,13 +87,13 @@ function live_changes {
    assert_diff touched
    assert_diff i_love_world
 
-   ## Test live changes b->a
-   touch test1b/touched-b
-   echo "I Love World B" >test1a/i_love_world-b
-   sleep 1.1
-   debug tree test1a test1b
-   assert_diff touched-b
-   assert_diff i_love_world-b
+   # ## Test live changes b->a
+   # touch test1b/touched-b
+   # echo "I Love World B" >test1a/i_love_world-b
+   # sleep 1.1
+   # debug tree test1a test1b
+   # assert_diff touched-b
+   # assert_diff i_love_world-b
    
    assert diff -q test1a/hello_world test1b/hello_world
 }
