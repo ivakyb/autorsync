@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
+## Copyright (c) 2019 Ivan Kuvaldin aka "kyb"
+## Under MIT License
+## https://gitlab.com/kyb/autorsync
+
 set -euo pipefail
 shopt -u failglob
 shopt -s lastpipe huponexit #inherit_errexit
 DEBUG={DEBUG:-1}
 
-VERSION=master-c27-gc5aa3d0-b160
-NPM_VERSION=1.27.160
+VERSION=master-c28-g8deda47-b163
+NPM_VERSION=1.28.163
 
 ## KNOWN ISSUES
 ## * fswatch on MacOS does not detect deleted folder (CHECK)
