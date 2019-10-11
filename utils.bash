@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-## See https://gitlab.com/etde/E1DCS-bin/snippets/1830522 
 ## DOWNLOAD:
 ##   curl -L 'https://gitlab.com/snippets/1830548/raw?inline=false' -o utils.bash
 ## USAGE: 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ## Author Ivan Kuvaldin aka "kyb"
-## Distributed under MIT License
+## Distributed under MIT License, https://opensource.org/licenses/MIT
 ## Project page https://gitlab.com/kyb/autorsync
 
 set -euo pipefail
@@ -21,14 +21,16 @@ NPM_VERSION=0.0.0
 ## * Cannot trap exit via ssh to remove .rsync.temp
 ## * Somehow fswatch_cmd "$DST_PATH" on remote host keeps running after stop of autorsync.
 ## * There is a problem in Docker containers on Mac to deliver inotify events to fswatch and inotify-tools. So for Docker on Mac container use --no-rx or --tx-only
-## ToDo
+
+## TODO
 ## * --help
 ## * --install and --install-symlink as they are in git-rev-label
-## * Useful hack -- protect myself from writing while executing
-## * Implement options under construction!
+## * --initial-tx-delete-missing
+## * --cleanup-temp
+## * Allow more than one SRC
 ## * For two side sync it is required to distinguish updates made by autorsync and updates made by others. To suppress cyclic updates.
 ## * OPTIMIZATION if DST is ssh-url, start rsyncd on destination host and user rsync:// for often rsync requests. Will be faster because does not need to open ssh connection every time.
-## * OPTIMIZATION Consider locate .rsync-temp in RAM, at least low low size files.
+## * OPTIMIZATION Consider locate .rsync-temp in RAM, at least for low size files.
 
 function darwin_aliases {
    if test `uname` == Darwin ;then
