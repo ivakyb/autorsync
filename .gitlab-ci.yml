@@ -14,7 +14,7 @@ build:
     paths: 
     - "autorsync"
 
-test_before_build:
+test_without_build:
   stage: build
   image: ubuntu
   variables:
@@ -32,8 +32,8 @@ test_before_build:
   #- ssh -vv -oPasswordAuthentication=no localhost echo test
   - ./test-autorsync.bash
   - ps -aux || true
-      
-    
+
+
 test:
   stage: test
   dependencies: 
@@ -53,7 +53,10 @@ npm_publish:
     GIT_DEPTH: 1
     #GIT_STRATEGY: none
   only:
-  - master
+    refs:
+    - master
+    variables:
+    - $NPM_TOKEN
   script:
   - apk add --no-cache --update npm bash
   - DEBUG echo -e '\e[1;37m'$(./autorsync --version)'\e[0m'
@@ -68,8 +71,43 @@ npm_publish:
   - test $(autorsync --version) = $(./autorsync --version)
   retry: 1
 
+  
+.deploy_common:
+  stage: deploy
+  only:
+    refs:
+    - branches
+    variables:
+    - $KI
+    
+warning_artifacts:
+  stage: deploy
+  image: alpine
+  dependencies:  ## empty
+  variables:
+    GIT_STRATEGY: none
+  only:
+    refs:
+    - branches
+    variables:
+    - $KI == ""
+  script:
+  - |
+    echo -e "\e[1;33m
+    ------------------------
+    Variable KI (ssh private key) is unset.
+    Skipping jobs store_artifacts, remove_stale_artifacts.
+    ------------------------
+    \e[1;37m
+    To enable store_artifacts
+    1. generate SSH key pair https://www.ssh.com/ssh/keygen
+    2. go to Settings -> Repository -> Deploy Keys and add one with write access enabled
+    3. go to Settings -> CI/CD -> Variables and put private key to variable KI.
+    \e[0m"
+
 ## --- STORE ARTIFACTS TO A DEDICATED BRANCH ---
 store_artifacts:
+  extends: .deploy_common
   stage: deploy
   dependencies:
   - build
@@ -105,6 +143,7 @@ store_artifacts:
 ## ToDO use git ls-remote. No fetch required. Much faster on a big repos! GIT_STRATEGY: none
 ## git ls-remote --heads "$CI_REPOSITORY_URL" artifacts/\* | cut -d\t -f2 | sed 's#refs/heads/##'
 remove_stale_artifacts:
+  extends: .deploy_common
   stage: deploy
   dependencies:
   image: alpine
