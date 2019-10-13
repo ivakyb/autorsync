@@ -83,7 +83,7 @@ do
          period="${1#--period=}"
          ;;
       --exclude=*)
-         echo "$1" >>$EXCLUDES_LIST
+         echo "${1#--exclude=}" >>$EXCLUDES_LIST
          USE_DEFAULT_EXCLUDES_LIST=${USE_DEFAULT_EXCLUDES_LIST:=n}  ## Set to 'n' if was not already set
          ;;
       --exclude-from=*)
