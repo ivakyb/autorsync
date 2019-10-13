@@ -8,8 +8,8 @@ shopt -u failglob
 shopt -s lastpipe huponexit #inherit_errexit
 DEBUG={DEBUG:-1}
 
-VERSION=master-c30-g66dbfd6-b197
-NPM_VERSION=1.30.197
+VERSION=master-c31-gbeb8b66-b201
+NPM_VERSION=1.31.201
 
 ## KNOWN ISSUES
 ## * fswatch on MacOS does not detect deleted folder (CHECK)
@@ -235,7 +235,7 @@ do
          period="${1#--period=}"
          ;;
       --exclude=*)
-         echo "$1" >>$EXCLUDES_LIST
+         echo "${1#--exclude=}" >>$EXCLUDES_LIST
          USE_DEFAULT_EXCLUDES_LIST=${USE_DEFAULT_EXCLUDES_LIST:=n}  ## Set to 'n' if was not already set
          ;;
       --exclude-from=*)
