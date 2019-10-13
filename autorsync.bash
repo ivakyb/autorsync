@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-## Copyright (c) 2019 Ivan Kuvaldin aka "kyb"
-## Under MIT License
-## https://gitlab.com/kyb/autorsync
+## Author Ivan Kuvaldin aka "kyb"
+## Distributed under MIT License
+## Project page https://gitlab.com/kyb/autorsync
 
 set -euo pipefail
 shopt -u failglob
