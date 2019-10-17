@@ -96,7 +96,7 @@ do
       --no-exclude-defaults)  ## Overrides --exclude-defaults to disable its behavior
          USE_DEFAULT_EXCLUDES_LIST=n
          ;;
-      --show-exclude-defaults)
+      --show-exclude-defaults|--show-default-exclude|--show-default-excludes)
          USE_DEFAULT_EXCLUDES_LIST=y
          SHOW_EXCLUDE_DEFAULTS=y
          break #STOP_PARSE_OPTIONS
@@ -185,12 +185,6 @@ do
    esac
    shift
 done
-## Assert
-var_is_set_not_empty SRC || fatalerr "Source is not set" 
-var_is_set_not_empty DST || fatalerr "Destination is not set" 
-## If SRC ends with slash '/' sync folder contents without the folder itself
-## ToDo: consider combinations DST/SRC/file/directory
-
 
 USE_DEFAULT_EXCLUDES_LIST=${USE_DEFAULT_EXCLUDES_LIST:=y}  ## if unset or empty, set to default value 'y'
 if test $USE_DEFAULT_EXCLUDES_LIST = y ;then
@@ -216,6 +210,12 @@ if var_is_set_not_empty SHOW_EXCLUDE_DEFAULTS && test $SHOW_EXCLUDE_DEFAULTS = y
    cat $EXCLUDES_LIST
    exit
 fi
+
+## Assert
+var_is_set_not_empty SRC || fatalerr "Source is not set" 
+var_is_set_not_empty DST || fatalerr "Destination is not set" 
+## If SRC ends with slash '/' sync folder contents without the folder itself
+## ToDo: consider combinations DST/SRC/file/directory
 
 function excludes_for_fswatch 
 {
