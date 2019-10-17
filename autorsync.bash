@@ -191,7 +191,6 @@ if test $USE_DEFAULT_EXCLUDES_LIST = y ;then
    cat >$EXCLUDES_LIST <<END
 .fseventsd
 .rsync.temp/
-.git
 .git/FETCH_HEAD
 .git/index.lock
 .git/modules/*/index.lock
