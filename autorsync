@@ -8,8 +8,8 @@ shopt -u failglob
 shopt -s lastpipe huponexit #inherit_errexit
 DEBUG={DEBUG:-1}
 
-VERSION=master-c36-g6804221-b204
-NPM_VERSION=1.36.204
+VERSION=master-c37-gd29e6d3-b207
+NPM_VERSION=1.37.207
 
 ## KNOWN ISSUES
 ## * fswatch on MacOS does not detect deleted folder (CHECK)
@@ -343,7 +343,6 @@ if test $USE_DEFAULT_EXCLUDES_LIST = y ;then
    cat >$EXCLUDES_LIST <<END
 .fseventsd
 .rsync.temp/
-.git
 .git/FETCH_HEAD
 .git/index.lock
 .git/modules/*/index.lock
