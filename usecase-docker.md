@@ -4,16 +4,24 @@ It is expected you already have [SSH key](https://www.ssh.com/ssh/keygen/).
 
 Run Docker container in background
 
-    docker run -itd --rm -p127.0.0.1:10022:22 --name ubu1 --hostname ubu1 ubuntu
+    docker run -itd -p127.0.0.1:30022:22 -p127.0.0.1:30873:873 --name ubu1 --hostname ubu1 ubuntu
 
-Add `authorized_keys` to the container
+Append your host public key to container's `authorized_keys`
 
     docker exec ubu1 mkdir -p /root/.ssh/
-    docker cp ~/.ssh/id_rsa ubu1:/root/.ssh/authorized_keys
+    docker exec ubu1 bash -c "echo $(cat ~/.ssh/id_rsa.pub) >> ~/.ssh/authorized_keys"
 
 Run `autorsync`
 
-    autorsync $PWD --rsh='ssh -p10022' root@localhost:$PWD
+    autorsync $PWD --rsh='ssh -p30022' root@localhost:$PWD
 
 
-_P.S. I wrote that from a memory, did not check, something could be missed.._
+Troubleshoting
+
+1. Assert sshd is running
+
+    docker exec ubu1 /usr/sbin/sshd
+    
+2. Check connection
+
+    ssh -Tnvvp30022 root@localhost
