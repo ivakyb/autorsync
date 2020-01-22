@@ -8,8 +8,8 @@ shopt -u failglob
 shopt -s lastpipe huponexit #inherit_errexit
 DEBUG={DEBUG:-1}
 
-VERSION=master-c39-g35f25ee-b209
-NPM_VERSION=1.39.209
+VERSION=master-c40-ga189ce0-b210
+NPM_VERSION=1.40.210
 
 ## KNOWN ISSUES
 ## * fswatch on MacOS does not detect deleted folder (CHECK)
