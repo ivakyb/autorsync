@@ -36,3 +36,11 @@ Run `autorsync`
        chmod 600       /root/.ssh/authorized_keys
 
        
+## Fish Shell 
+You may also want to install and use Fish Shell instead of Bash:
+
+    apt update
+    apt install software-properties-common
+    apt-add-repository ppa:fish-shell/release-3
+    apt update
+    apt install fish 
