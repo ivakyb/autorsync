@@ -34,7 +34,7 @@ assert(){
       excod=$?
       #echoerr "Assert FAILED in ${BASH_SOURCE[0]:-}:${BASH_LINENO[0]} ${FUNCNAME[1]:-nofunc}()  $@"
       #echoerr "Assert FAILED in ${BASH_SOURCE[1]:-}:${BASH_LINENO[0]} ${FUNCNAME[1]:-nofunc}()  $@"
-      caller | { read line file; echoerr "Assert FAILED in $file:line  $@" ;}
+      caller | { read line file; echoerr "Assert FAILED in $file:$line  $@" ;}
       #stacktrace #2 2
       exit 1
    }
