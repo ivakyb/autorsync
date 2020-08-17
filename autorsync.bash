@@ -55,7 +55,7 @@ source $mydir/utils.bash
 
 trap_append 'echoinfo autorsync: TERMINATED' TERM
 trap_append 'echoinfo autorsync: INTERRUPTED' INT
-trap_append 'echoinfo autorsync: CAUGHT SIGHUP' HUP
+trap_append 'echoinfo autorsync: HANG UP' HUP
 trap_append 'ps=$(jobs -p); ${ps:+ kill $ps} || true;' EXIT
 #trap "kill -hup 0" hup
 
@@ -87,7 +87,7 @@ do
          USE_DEFAULT_EXCLUDES_LIST=${USE_DEFAULT_EXCLUDES_LIST:=n}  ## Set to 'n' if was not already set
          ;;
       --exclude-from=*)
-         cat "$1" >>$EXCLUDES_LIST
+         cat "${1#--exclude-from=}" >>$EXCLUDES_LIST
          USE_DEFAULT_EXCLUDES_LIST=${USE_DEFAULT_EXCLUDES_LIST:=n}  ## Set to 'n' if was not already set
          ;;
       --exclude-defaults)  ## Normally DEFAULT_EXCLUDES_LIST is not used when --excludes and/or --excludes-from options are set. This brings excludes together.
@@ -188,7 +188,7 @@ done
 
 USE_DEFAULT_EXCLUDES_LIST=${USE_DEFAULT_EXCLUDES_LIST:=y}  ## if unset or empty, set to default value 'y'
 if test $USE_DEFAULT_EXCLUDES_LIST = y ;then
-   cat >$EXCLUDES_LIST <<END
+   cat >>$EXCLUDES_LIST <<END
 .fseventsd
 .rsync.temp/
 .git/FETCH_HEAD
