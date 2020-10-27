@@ -67,6 +67,7 @@ or the same *npm i -g autorsync*
 **Inspired by** article [How to speed up shared file access in Docker for Mac][2] by Sebastian Barthel
 
   [2]: https://medium.freecodecamp.org/speed-up-file-access-in-docker-for-mac-fbeee65d0ee7
+  [3]: https://www.jeffgeerling.com/blog/2020/revisiting-docker-macs-performance-nfs-volumes
 
 
 ## [License](LICENSE)
